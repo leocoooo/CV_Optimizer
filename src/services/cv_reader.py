@@ -44,8 +44,8 @@ class CVReader:
             return cleaned_text
             
         except (FileNotFoundError, fitz.FileDataError) as e:
-             logger.error(f"Erreur lors de l'extraction du CV : {e}")
-             return ""
+            logger.error(f"Erreur lors de l'extraction du CV : {e}")
+            return ""
         except Exception as e:
             logger.error(f"Erreur inattendue lors de l'extraction du CV : {e}")
             raise
