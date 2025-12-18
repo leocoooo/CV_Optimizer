@@ -51,5 +51,5 @@ class CVReader:
             raise
 if __name__ == "__main__":
     reader = CVReader()
-    text = reader.extract_text("data/CVs/CV WECKER.pdf")
-    print(text[:500])  
+    text = reader.extract_text("data/CVs/Exemple de CV Data engineer.pdf")
+    print(text)  
