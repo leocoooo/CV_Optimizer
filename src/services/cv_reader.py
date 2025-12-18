@@ -14,9 +14,9 @@ class CVReader:
         # 2. Suppression des caractères de contrôle et non-imprimables
         text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
         
-        # 3. Remplacement des caractères spéciaux/icônes par des espaces
-        # On ne garde que les lettres, chiffres, ponctuation de base et espaces
-        text = re.sub(r'[^a-zA-Z0-9àâäéèêëîïôöùûüçÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ\s\.,;:\-\(\)@]', ' ', text)
+        # 3. On garde le slettres, chiffres, ponctuations de base et espaces
+        # On enlève les symboles, les emojis et les autres caractères non textuels
+        text = re.sub(r'[^\w\s\.,;:\-\(\)@]', ' ', text, flags=re.UNICODE)
         
         # 4. Nettoyage des espaces multiples et retours à la ligne
         text = re.sub(r'\s+', ' ', text)
@@ -29,13 +29,11 @@ class CVReader:
         """
         try:
             logger.info(f"Analyse du CV : {pdf_path}")
-            doc = fitz.open(pdf_path)
-            raw_text = ""
-            
-            for page in doc:
-                raw_text += page.get_text("text") + " "
-            
-            doc.close()
+            with fitz.open(pdf_path) as doc:
+              raw_text = ""
+              
+              for page in doc:
+                   raw_text += page.get_text("text") + " "
             
             # Application du nettoyage
             cleaned_text = self.clean_text(raw_text)
@@ -45,11 +43,14 @@ class CVReader:
             
             return cleaned_text
             
+        except (FileNotFoundError, fitz.FileDataError) as e:
+             logger.error(f"Erreur lors de l'extraction du CV : {e}")
+             return ""
         except Exception as e:
-            logger.error(f"Erreur lors de l'extraction du CV : {e}")
-            return ""
-
+            logger.error(f"Erreur inattendue lors de l'extraction du CV : {e}")
+            raise
 if __name__ == "__main__":
     reader = CVReader()
-    text = reader.extract_text("data\CVs\CV WECKER.pdf")
+    text = reader.extract_text("data/CVs/CV WECKER.pdf")
     print(text[:500])  
+    
