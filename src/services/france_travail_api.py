@@ -22,8 +22,7 @@ class FranceTravailAPI:
             'scope': 'api_offresdemploiv2 o2dsoffre' 
         }
         
-        response = httpx.post(self.auth_url, data=data, headers=headers)
-        
+        response = httpx.post(self.auth_url, data=data, headers=headers, timeout=10.0)        
         if response.status_code != 200:
             print(f"Erreur Auth : {response.status_code}")
             print(f"Détail : {response.text}")
@@ -74,7 +73,7 @@ class FranceTravailAPI:
             return []
 
 if __name__ == "__main__":
-    # Test rapide du module
+    # Test du module
     ft_api = FranceTravailAPI()
     print("Test de récupération des offres...")
     offers = ft_api.fetch_offers(keywords="Data", range_str="0-19")
