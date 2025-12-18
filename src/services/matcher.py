@@ -49,8 +49,8 @@ class JobMatcher:
 
         # 2. Requête SQL Hybride (Vecteur + Filtres Stricts)
         query_str = f"""
-            SELECT id, title, company, location, type_contrat, experience_exigee,
-                   (1 - (embedding <=> :vector)) AS similarity_score
+            SELECT id, title, company, location, type_contrat, experience_exigee, url, id,
+                (1 - (embedding <=> :vector)) AS similarity_score
             FROM job_offers
             {where_clause}
             ORDER BY similarity_score DESC
@@ -96,3 +96,4 @@ if __name__ == "__main__":
             print(f"[{score}%] {row.title}")
             print(f"      Entreprise: {row.company} | Ville: {row.location}")
             print(f"      Contrat: {row.type_contrat} | Exp: {row.experience_exigee}\n")
+            print(f"      Lien: {row.url} | ID: {row.id}\n")
