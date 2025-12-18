@@ -14,7 +14,7 @@ class CVReader:
         # 2. Suppression des caractères de contrôle et non-imprimables
         text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
         
-        # 3. On garde le slettres, chiffres, ponctuations de base et espaces
+        # 3. On garde les lettres, chiffres, ponctuations de base et espaces
         # On enlève les symboles, les emojis et les autres caractères non textuels
         text = re.sub(r'[^\w\s\.,;:\-\(\)@]', ' ', text, flags=re.UNICODE)
         
@@ -53,4 +53,3 @@ if __name__ == "__main__":
     reader = CVReader()
     text = reader.extract_text("data/CVs/CV WECKER.pdf")
     print(text[:500])  
-    
