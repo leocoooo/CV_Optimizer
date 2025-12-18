@@ -36,20 +36,36 @@ def save_offers_to_db(db: Session, offers_json: list):
     """
     new_offers_count = 0
     
-    for item in offers_json:
+    for offer_data in offers_json:
         # Vérification de l'ID unique France Travail
-        offer_id = item.get("id")
+        offer_id = offer_data.get("id")
         existing_offer = db.query(JobOffer).filter(JobOffer.id == offer_id).first()
         
         if not existing_offer:
+            # new_offer = JobOffer(
+            #     id=offer_id,
+            #     title=offer_data.get("intitule"),
+            #     description=clean_description(offer_data.get("description")),
+            #     company=offer_data.get("entreprise", {}).get("nom", "Non spécifiée"),
+            #     location=offer_data.get("lieuTravail", {}).get("libelle", "Non spécifiée"),
+            #     embedding=None 
+            # )
+
             new_offer = JobOffer(
-                id=offer_id,
-                title=item.get("intitule"),
-                description=clean_description(item.get("description")),
-                company=item.get("entreprise", {}).get("nom", "Non spécifiée"),
-                location=item.get("lieuTravail", {}).get("libelle", "Non spécifiée"),
-                embedding=None 
+                id=offer_data.get("id"),
+                title=offer_data.get("intitule"),
+                company=offer_data.get("entreprise", {}).get("nom", "Non spécifié"),
+                location=offer_data.get("lieuTravail", {}).get("libelle"),
+                description=clean_description(offer_data.get("description")),
+                url=offer_data.get("origineOffre", {}).get("urlOrigine"),
+                date_creation=offer_data.get("dateCreation"),
+                date_actualisation=offer_data.get("dateActualisation"),
+                type_contrat=offer_data.get("typeContrat"),
+                experience_exigee=offer_data.get("experienceExige"),
+                contact=str(offer_data.get("contact", {})), 
+                source="france_travail"
             )
+
             db.add(new_offer)
             new_offers_count += 1
             
