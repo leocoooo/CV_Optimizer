@@ -1,13 +1,11 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, func
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, String, Text, DateTime, func
 from pgvector.sqlalchemy import Vector 
-
-Base = declarative_base()
+from src.database.database import Base
 
 class JobOffer(Base):
     __tablename__ = 'job_offers'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(50), primary_key=True, index=True)
     title = Column(String(255), nullable=False) 
     company = Column(String(255))
     location = Column(String(100))

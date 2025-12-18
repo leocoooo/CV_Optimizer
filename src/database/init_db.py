@@ -1,32 +1,40 @@
 import os
 from sqlalchemy import create_engine, text
 from sqlalchemy_utils import database_exists, create_database
-from src.database.models import Base 
+from loguru import logger
 from dotenv import load_dotenv
 
-# Chargement de l'URL depuis l'environnement 
+# IMPORT CRUCIAL : C'est ici que SQLAlchemy découvre vos tables
+from src.database.database import Base
+from src.database.models import JobOffer 
+
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def init_db():
     engine = create_engine(DATABASE_URL)
     
-    # 1. Créer la database si elle n'existe pas
+    # 1. Création de la base de données si nécessaire
     if not database_exists(engine.url):
         create_database(engine.url)
-        print("✅ Base de données créée.")
+        logger.info("Base de données créée.")
 
-    # 2. Activer l'extension pgvector
-    with engine.connect() as conn:
-        # On utilise text() pour les commandes SQL brutes
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-        conn.commit()
-        print("✅ Extension pgvector activée.")
+    # 2. Activation de l'extension pgvector pour la recherche sémantique
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            conn.commit()
+            logger.success("Extension pgvector activée.")
+    except Exception as e:
+        logger.error(f"Erreur lors de l'activation de pgvector : {e}")
 
-    # 3. Créer les tables
-    # C'est ici que le changement opère : on appelle create_all sur metadata
-    Base.metadata.create_all(bind=engine)
-    print("✅ Tables créées avec succès.")
+    # 3. Création des tables définies dans les modèles importés
+    try:
+        # Comme JobOffer est importé, Base.metadata contient maintenant la structure
+        Base.metadata.create_all(bind=engine)
+        logger.success("Tables créées avec succès.")
+    except Exception as e:
+        logger.error(f"Erreur lors de la création des tables : {e}")
 
 if __name__ == "__main__":
     init_db()
