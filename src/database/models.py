@@ -10,6 +10,11 @@ class JobOffer(Base):
     company = Column(String(255))
     location = Column(String(100))
     description = Column(Text, nullable=False)
+    date_creation = Column(DateTime)
+    date_actualisation = Column(DateTime)
+    type_contrat = Column(String(50))
+    experience_exigee = Column(String(100))
+    contact = Column(Text) # Stockage des infos de contact (email/nom)
     
     # Métadonnées pour le tracking
     source = Column(String(50)) # 'france_travail' ou 'web_scraping' 
