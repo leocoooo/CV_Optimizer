@@ -79,33 +79,7 @@ def scrape_wttj_json_strategy(keywords):
 if __name__ == "__main__":
 
     keywords = ["Data Scientist",
-                "Data Analyst",
-                "Data Engineer",
-                "Machine Learning Engineer",
-                "Architecte Big Data",
-                "Business Intelligence",
-                "Data Manager",
-
-                # Développement Software
-                "Développeur Python",
-                "Développeur Fullstack",
-                "Développeur Backend",
-                "Développeur Frontend",
-                "Software Engineer",
-
-                # Cloud & DevOps (très liés à la Data)
-                "DevOps",
-                "Cloud Engineer",
-                "Architecte Cloud",
-                "Site Reliability Engineer",
-
-                # Technologies spécifiques (Mots-clés techniques)
-                "Spark",
-                "Kubernetes",
-                "AWS",
-                "Azure",
-                "SQL",
-                "NoSQL"]
+                "Data Analyst"]
     
     df = scrape_wttj_json_strategy(keywords)
     if not df.empty:
