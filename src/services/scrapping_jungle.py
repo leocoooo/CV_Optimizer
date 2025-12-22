@@ -1,6 +1,5 @@
 import pandas as pd
 import time
-import uuid
 import json
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -8,6 +7,8 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from src.services.utils import get_job_id
+
 
 def scrape_wttj_json_strategy(keywords):
     service = Service(ChromeDriverManager().install())
@@ -42,18 +43,30 @@ def scrape_wttj_json_strategy(keywords):
                     script_element = driver.find_element(By.XPATH, "//script[@type='application/ld+json']")
                     job_data = json.loads(script_element.get_attribute("innerHTML"))
 
+                    # Extraction sécurisée des variables
+                    company = job_data.get("hiringOrganization", {}).get("name") or "Inconnu"
+                    title = job_data.get("title") or "Sans titre"
+                    locations = job_data.get("jobLocation", [])
+                    location_city = "N/C"
+                    if locations and isinstance(locations, list):
+                        location_city = locations[0].get("address", {}).get("addressLocality") or "N/C"
+
                     # Initialisation de la ligne avec tes colonnes
                     row = {
-                        "id": str(uuid.uuid4()),
-                        "titre": job_data.get("title"),
-                        "entreprise": job_data.get("hiringOrganization", {}).get("name"),
-                        "date_sortie": job_data.get("datePosted"),
-                        "location": job_data.get("jobLocation", [{}])[0].get("address", {}).get("addressLocality"),
+                        "id": get_job_id(company, title, location_city), # ID déterministe
+                        "title": title,
+                        "company": company,
+                        "location": location_city,
                         "description": job_data.get("description"),
+                        "date_creation": job_data.get("datePosted"),
+                        "date_actualisation": None, # à trouver si possible
                         "type_contrat": job_data.get("employmentType"),
-                        "experience_exigee": None, # Non présent dans le JSON, on cherche après
+                        "experience_exigee": None,
+                        "contact": None, # à trouver si possible
+                        "source": "Welcome to the Jungle",
                         "url": link,
-                        "source": "Welcome to the Jungle"
+                        "created_at" : pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+                        
                     }
 
                     # --- COMPLÉMENT POUR LES COMPÉTENCES (Via les badges) ---
