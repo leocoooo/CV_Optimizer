@@ -41,7 +41,7 @@ def orchestrate_matching(cv_path: str):
         score = round(res.similarity_score * 100, 2)
         print(f"{i}. [{score}%] {res.title}")
         print(f"   🏢 {res.company} | 📍 {res.location}")
-        print(f"   📜 {res.type_contrat} | ⏳ {res.experience_exigee}")
+        print(f"   📜 {res.contract_type} | ⏳ {res.required_experience}")
         print(f"   🔗 Lien : {res.url} | ID: {res.id}")
         print("-" * 30)
 

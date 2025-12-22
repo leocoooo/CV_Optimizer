@@ -29,7 +29,7 @@ class JobMatcher:
 
         # Calcul de la date limite pour ne pas avoir des offres trop vieilles
         limit_date = datetime.now() - timedelta(days=days_limit)
-        filters.append("date_actualisation >= :limit_date")
+        filters.append("actualisation_date >= :limit_date")
         params["limit_date"] = limit_date
 
         if location:
@@ -37,11 +37,11 @@ class JobMatcher:
             params["location"] = f"%{location}%"
         
         if contract_type:
-            filters.append("type_contrat = :contract_type")
+            filters.append("contract_type = :contract_type")
             params["contract_type"] = contract_type
 
         if experience:
-            filters.append("experience_exigee ILIKE :experience")
+            filters.append("required_experience ILIKE :experience")
             params["experience"] = f"%{experience}%"
 
         # Assemblage de la clause WHERE
@@ -49,7 +49,7 @@ class JobMatcher:
 
         # 2. Requête SQL Hybride (Vecteur + Filtres Stricts)
         query_str = f"""
-            SELECT id, title, company, location, type_contrat, experience_exigee, url, id,
+            SELECT id, title, company, location, contract_type, required_experience, url, id,
                 (1 - (embedding <=> :vector)) AS similarity_score
             FROM job_offers
             {where_clause}
@@ -67,7 +67,7 @@ class JobMatcher:
 if __name__ == "__main__":
     matcher = JobMatcher()
     
-    # --- SCÉNARIO DE TEST ---
+    #  TEST 
     test_profile = """
     Je suis un jeune diplômé en Data Science, je maîtrise Python, 
     le machine learning avec scikit-learn et la manipulation de données avec Pandas.
@@ -95,5 +95,5 @@ if __name__ == "__main__":
             score = round(row.similarity_score * 100, 2)
             print(f"[{score}%] {row.title}")
             print(f"      Entreprise: {row.company} | Ville: {row.location}")
-            print(f"      Contrat: {row.type_contrat} | Exp: {row.experience_exigee}\n")
+            print(f"      Contrat: {row.contract_type} | Exp: {row.required_experience}\n")
             print(f"      Lien: {row.url} | ID: {row.id}\n")

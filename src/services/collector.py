@@ -42,14 +42,6 @@ def save_offers_to_db(db: Session, offers_json: list):
         existing_offer = db.query(JobOffer).filter(JobOffer.id == offer_id).first()
         
         if not existing_offer:
-            # new_offer = JobOffer(
-            #     id=offer_id,
-            #     title=offer_data.get("intitule"),
-            #     description=clean_description(offer_data.get("description")),
-            #     company=offer_data.get("entreprise", {}).get("nom", "Non spécifiée"),
-            #     location=offer_data.get("lieuTravail", {}).get("libelle", "Non spécifiée"),
-            #     embedding=None 
-            # )
 
             new_offer = JobOffer(
                 id=offer_data.get("id"),
@@ -58,10 +50,10 @@ def save_offers_to_db(db: Session, offers_json: list):
                 location=offer_data.get("lieuTravail", {}).get("libelle"),
                 description=clean_description(offer_data.get("description")),
                 url=offer_data.get("origineOffre", {}).get("urlOrigine"),
-                date_creation=offer_data.get("dateCreation"),
-                date_actualisation=offer_data.get("dateActualisation"),
-                type_contrat=offer_data.get("typeContrat"),
-                experience_exigee=offer_data.get("experienceExige"),
+                creation_date=offer_data.get("dateCreation"),
+                actualisation_date=offer_data.get("dateActualisation"),
+                contract_type=offer_data.get("typeContrat"),
+                required_experience=offer_data.get("experienceExige"),
                 contact=str(offer_data.get("contact", {})), 
                 source="france_travail"
             )
@@ -79,22 +71,17 @@ def save_offers_to_db(db: Session, offers_json: list):
         db.rollback()
         logger.exception(f"Erreur critique lors de l'insertion en base : {e}")
 
-def run_collector():
+def run_collector(keywords_to_fetch):
     """
     Orchestrateur de la collecte de données.
     """
+
+    if not keywords_to_fetch:
+        logger.error("La liste des mots-clés est vide. Veuillez fournir des mots-clés pour la recherche API.")
+        return
+    
     api = FranceTravailAPI()
     db = SessionLocal()
-    
-    keywords_to_fetch = [
-        "Data Scientist", "Data Analyst", "Data Engineer", 
-        "Machine Learning Engineer", "Architecte Big Data", 
-        "Business Intelligence", "Data Manager", "Développeur Python", 
-        "Développeur Fullstack", "Développeur Backend", "Développeur Frontend", 
-        "Software Engineer", "DevOps", "Cloud Engineer", 
-        "Architecte Cloud", "Site Reliability Engineer", 
-        "Spark", "Kubernetes", "AWS", "Azure", "SQL", "GCP", "NoSQL"
-    ]
 
     logger.info("Démarrage du cycle de collecte CV-Optimizer")
 
@@ -117,4 +104,8 @@ def run_collector():
         logger.info("Session de base de données fermée. Fin du programme.")
 
 if __name__ == "__main__":
-    run_collector()
+
+    keywords_to_fetch = [
+        "Data Scientist", "Data Analyst", "Data Engineer"
+    ]
+    run_collector(keywords_to_fetch)

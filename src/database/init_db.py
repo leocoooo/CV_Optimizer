@@ -4,7 +4,7 @@ from sqlalchemy_utils import database_exists, create_database
 from loguru import logger
 from dotenv import load_dotenv
 
-# IMPORT CRUCIAL : C'est ici que SQLAlchemy découvre vos tables
+# NE PAS MODIFIER : C'est ici que SQLAlchemy découvre les tables
 from src.database.database import Base
 from src.database.models import JobOffer 
 
@@ -14,12 +14,12 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 def init_db():
     engine = create_engine(DATABASE_URL)
     
-    # 1. Création de la base de données si nécessaire
+    # Création de la base de données si nécessaire
     if not database_exists(engine.url):
         create_database(engine.url)
         logger.info("Base de données créée.")
 
-    # 2. Activation de l'extension pgvector pour la recherche sémantique
+    # Activation de l'extension pgvector pour la recherche sémantique
     try:
         with engine.connect() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
@@ -28,7 +28,7 @@ def init_db():
     except Exception as e:
         logger.error(f"Erreur lors de l'activation de pgvector : {e}")
 
-    # 3. Création des tables définies dans les modèles importés
+    # Création des tables définies dans les modèles importés
     try:
         # Comme JobOffer est importé, Base.metadata contient maintenant la structure
         Base.metadata.create_all(bind=engine)
