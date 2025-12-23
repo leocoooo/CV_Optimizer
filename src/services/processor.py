@@ -18,7 +18,7 @@ def process_embeddings():
     
     try:
         # 1. Sélection des offres sans embedding
-        offers_to_process = db.query(JobOffer).filter(JobOffer.embedding == None).all()
+        offers_to_process = db.query(JobOffer).filter(JobOffer.embedding.is_(None)).all()
         total = len(offers_to_process)
         
         if total == 0:
