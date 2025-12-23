@@ -58,14 +58,13 @@ def scrape_wttj_json_strategy(keywords):
                         "company": company,
                         "location": location_city,
                         "description": job_data.get("description"),
-                        "date_creation": job_data.get("datePosted"),
-                        "date_actualisation": None, # à trouver si possible
-                        "type_contrat": job_data.get("employmentType"),
-                        "experience_exigee": None,
+                        "creation_date": job_data.get("datePosted"),
+                        "actualisation_date": None, # à trouver si possible
+                        "contract_type": job_data.get("employmentType"),
+                        "required_experience": None,
                         "contact": None, # à trouver si possible
                         "source": "Welcome to the Jungle",
                         "url": link,
-                        "created_at" : pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
                         
                     }
 
@@ -78,7 +77,7 @@ def scrape_wttj_json_strategy(keywords):
                         row["competences"] = None
 
                     all_data.append(row)
-                    print(f"Succès : {row['titre']} chez {row['entreprise']}")
+                    print(f"Succès : {row['title']} chez {row['company']}")
 
                 except Exception as e:
                     print(f"Échec sur {link.split('/')[-1]} : Structure non détectée. Erreur : {e}")
@@ -96,5 +95,5 @@ if __name__ == "__main__":
     
     df = scrape_wttj_json_strategy(keywords)
     if not df.empty:
-        print(df[['titre', 'entreprise', 'type_contrat']].head())
+        print(df[['title', 'company', 'contract_type']].head())
         df.to_csv("data_scrapping/main_offres_welcome_to_jungle.csv", index=False)
