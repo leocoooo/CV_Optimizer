@@ -1,23 +1,59 @@
-import pandas as pd
+import sys
 import time
 import json
 import hashlib
+import re
+import unicodedata
+from loguru import logger
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from selenium.common.exceptions import TimeoutException
 
-def get_existing_ids(conn):
+from src.database.database import SessionLocal
+from src.database.models import JobOffer
+
+# Configuration du logger (même style que collector.py)
+logger.remove()
+logger.add(sys.stderr, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>", level="INFO")
+
+def get_existing_ids(db_session):
     """Récupère les IDs déjà présents en base pour éviter le double scrap."""
-    query = "SELECT id FROM jobs_france_travail" # Adapte le nom de ta table
-    return set(pd.read_sql(query, conn)['id'].tolist())
+    return {offer.id for offer in db_session.query(JobOffer.id).all()}
 
-def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_connection=None):
+
+def clean_description(html_text: str) -> str:
+    """
+    Nettoie la description HTML pour ne garder que le contenu textuel utile.
+    Combine la suppression HTML (BeautifulSoup) + nettoyage Unicode (comme cv_reader).
+    """
+    if not html_text:
+        return ""
+    
+    # 1. Suppression des balises HTML
+    soup = BeautifulSoup(html_text, "html.parser")
+    text = soup.get_text(separator=" ")
+    
+    # 2. Normalisation Unicode (accents, caractères spéciaux)
+    text = unicodedata.normalize("NFKC", text)
+    
+    # 3. Suppression des caractères de contrôle et non-imprimables
+    text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
+    
+    # 4. Garde lettres, chiffres, ponctuations de base et espaces
+    text = re.sub(r'[^\w\s\.,;:\-\(\)@\'"&]', ' ', text, flags=re.UNICODE)
+    
+    # 5. Nettoyage des espaces multiples
+    text = re.sub(r'\s+', ' ', text)
+    
+    return text.strip()
+
+
+def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None):
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
     options.add_argument("--headless") # Mode sans interface pour la prod
@@ -26,12 +62,12 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_connection=None
     driver = webdriver.Chrome(service=service, options=options)
     
     # Récupération des IDs déjà scrapés (en base + run actuel)
-    existing_ids = get_existing_ids(db_connection) if db_connection else set()
+    existing_ids = get_existing_ids(db_session) if db_session else set()
     all_data = []
 
     try:
         for kw in keywords:
-            print(f"\n--- Recherche WTTJ : {kw} ---")
+            logger.info(f"Recherche WTTJ : {kw}")
             count_for_kw = 0
             page = 1
             
@@ -44,8 +80,8 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_connection=None
                     WebDriverWait(driver, 10).until(
                         EC.presence_of_all_elements_located((By.CSS_SELECTOR, "li[data-testid='search-results-list-item-wrapper']"))
                     )
-                except:
-                    print(f"Fin des résultats pour {kw} à la page {page}.")
+                except TimeoutException:
+                    logger.info(f"Fin des résultats pour {kw} à la page {page}.")
                     break
 
                 # 2. On récupère toutes les cartes de la page
@@ -83,7 +119,7 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_connection=None
 
                         # --- VÉRIFICATION DÉDOUBLONNAGE ---
                         if job_id in existing_ids:
-                            print(f"Skipping : {title} (Déjà en base)")
+                            logger.debug(f"Skipping : {title} (Déjà en base)")
                             continue
 
                         # Extraction du reste des données (ta logique précédente...)
@@ -94,7 +130,7 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_connection=None
                             "location": location,
                             "url": link,
                             "source": "Welcome to the Jungle",
-                            "description": job_data.get("description"),
+                            "description": clean_description(job_data.get("description")),
                             "creation_date": job_data.get("datePosted"),
                             "contract_type": job_data.get("employmentType"),
                             "required_experience": None,
@@ -105,57 +141,116 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_connection=None
                         all_data.append(row)
                         existing_ids.add(job_id) # Ajout au set pour éviter les doublons inter-mots-clés
                         count_for_kw += 1
-                        print(f"[{count_for_kw}/{max_offres_per_kw}] Scrapé : {title}")
+                        logger.info(f"[{count_for_kw}/{max_offres_per_kw}] Scrapé : {title}")
 
                     except Exception as e:
-                        print(f"Erreur sur {link}: {e}")
+                        logger.warning(f"Erreur sur {link}: {e}")
 
                 page += 1 # Incrémenter la page de recherche si on n'a pas atteint le quota
 
     finally:
         driver.quit()
 
-    return pd.DataFrame(all_data)
+    return all_data
+
+
+def save_wttj_offers_to_db(db_session, offers: list):
+    """
+    Persiste les offres scrapées en base de données.
+    Pattern identique à save_offers_to_db() dans collector.py.
+    """
+    if not offers:
+        logger.info("Aucune offre à insérer.")
+        return 0
+    
+    new_offers_count = 0
+    
+    for offer_data in offers:
+        try:
+            new_offer = JobOffer(
+                id=offer_data["id"],
+                title=offer_data["title"],
+                company=offer_data["company"],
+                location=offer_data["location"],
+                description=offer_data["description"],
+                url=offer_data["url"],
+                source=offer_data["source"],
+                creation_date=offer_data.get("creation_date"),
+                actualisation_date=offer_data.get("actualisation_date"),
+                contract_type=offer_data.get("contract_type"),
+                required_experience=offer_data.get("required_experience"),
+                contact=offer_data.get("contact"),
+            )
+            db_session.add(new_offer)
+            new_offers_count += 1
+        except Exception as e:
+            logger.warning(f"Erreur lors de la préparation de l'offre {offer_data.get('title')}: {e}")
+    
+    try:
+        db_session.commit()
+        if new_offers_count > 0:
+            logger.success(f"Insertion : {new_offers_count} nouvelles offres WTTJ ajoutées en base.")
+    except Exception as e:
+        db_session.rollback()
+        logger.error(f"Erreur lors de l'insertion en base : {e}")
+        return 0
+    
+    return new_offers_count
+
+
+def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False):
+    """
+    Orchestrateur du scraping WTTJ - même pattern que run_collector().
+    
+    Args:
+        keywords_to_fetch: Liste des mots-clés à rechercher
+        max_offres_per_kw: Nombre max d'offres par mot-clé
+        save_to_db: Si True, insère les offres en base de données
+    
+    Returns:
+        Liste des offres scrapées
+    """
+    if not keywords_to_fetch:
+        logger.error("La liste des mots-clés est vide.")
+        return []
+    
+    db = SessionLocal()
+    logger.info("Démarrage du scraping Welcome to the Jungle")
+    scraped_offers = []
+
+    try:
+        # 1. Lancement du scraping
+        scraped_offers = scrape_wttj_json_strategy(
+            keywords=keywords_to_fetch,
+            max_offres_per_kw=max_offres_per_kw,
+            db_session=db
+        )
+
+        # 2. Synthèse
+        if scraped_offers:
+            logger.success(f"Scraping terminé : {len(scraped_offers)} nouvelles offres trouvées.")
+            for offer in scraped_offers[:3]:  # Affiche les 3 premières
+                logger.info(f"  → {offer['title']} chez {offer['company']}")
+            
+            # 3. Insertion en BDD si demandé
+            if save_to_db:
+                save_wttj_offers_to_db(db, scraped_offers)
+        else:
+            logger.info("Aucune nouvelle offre à traiter.")
+
+    except Exception as e:
+        logger.critical(f"Échec du scraping WTTJ : {e}")
+    finally:
+        db.close()
+        logger.info("Session de base de données fermée.")
+
+    return scraped_offers
+
 
 if __name__ == "__main__":
-
-    load_dotenv()
-
-    # 1. Récupération de l'URL de la base de données
-    db_url = os.getenv("DATABASE_URL")
     
-    if not db_url:
-        print("Erreur : DATABASE_URL non trouvée dans le fichier .env")
-    else:
-        # Correction de l'URL si nécessaire (compatibilité SQLAlchemy)
-        if db_url.startswith("postgres://"):
-            db_url = db_url.replace("postgres://", "postgresql://", 1)
-
-        try:
-            # 2. Création de l'engine
-            engine = create_engine(db_url)
-            print("Connexion à PostgreSQL (via DATABASE_URL) établie.")
-            
-            # 3. Paramètres de recherche
-            keywords_to_test = ["Data Engineer", "Machine Learning"]
-            limit_per_keyword = 3 # Test rapide
-            
-            # 4. Lancement du scrap
-            # On passe l'engine à ta fonction pour qu'elle puisse vérifier les IDs
-            print("Lancement du test sur WTTJ...")
-            df_results = scrape_wttj_json_strategy(
-                keywords=keywords_to_test, 
-                max_offres_per_kw=limit_per_keyword, 
-                db_connection=engine
-            )
-
-            # 5. Synthèse
-            if not df_results.empty:
-                print(f"\nScraping terminé : {len(df_results)} nouvelles offres trouvées.")
-                print(df_results[['title', 'company', 'id']].head())
-                
-            else:
-                print("\nAucune nouvelle offre à traiter.")
-
-        except Exception as e:
-            print(f"Erreur lors de l'exécution : {e}")
+    # Test avec insertion en base de données
+    keywords_to_test = ["Machine Learning"]
+    offers = run_wttj_scraper(keywords_to_test, max_offres_per_kw=3, save_to_db=True)
+    
+    print(f"\nRésultat : {len(offers)} offres traitées")

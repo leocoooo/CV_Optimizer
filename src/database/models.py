@@ -5,7 +5,7 @@ from src.database.database import Base
 class JobOffer(Base):
     __tablename__ = 'job_offers'
 
-    id = Column(String(50), primary_key=True, index=True)
+    id = Column(String(64), primary_key=True, index=True)
     title = Column(String(255), nullable=False) 
     company = Column(String(255))
     location = Column(String(100))
