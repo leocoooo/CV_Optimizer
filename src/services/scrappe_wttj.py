@@ -17,9 +17,8 @@ from selenium.common.exceptions import TimeoutException
 from src.database.database import SessionLocal
 from src.database.models import JobOffer
 
-# Configuration du logger (même style que collector.py)
 logger.remove()
-logger.add(sys.stderr, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>", level="INFO")
+logger.add(sys.stderr, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>", level="DEBUG")
 
 def get_existing_ids(db_session):
     """Récupère les IDs déjà présents en base pour éviter le double scrap."""
@@ -53,10 +52,11 @@ def clean_description(html_text: str) -> str:
     return text.strip()
 
 
-def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None):
+def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, headless=True):
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless") # Mode sans interface pour la prod
+    if headless:
+        options.add_argument("--headless") # Mode sans interface pour la prod
     options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
     driver = webdriver.Chrome(service=service, options=options)
@@ -75,7 +75,7 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None):
                 url_search = f"https://www.welcometothejungle.com/fr/jobs?query={kw.replace(' ', '%20')}&page={page}"
                 driver.get(url_search)
                 
-                # 1. Attente des cartes d'offres
+                # Attente des cartes d'offres
                 try:
                     WebDriverWait(driver, 10).until(
                         EC.presence_of_all_elements_located((By.CSS_SELECTOR, "li[data-testid='search-results-list-item-wrapper']"))
@@ -84,7 +84,7 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None):
                     logger.info(f"Fin des résultats pour {kw} à la page {page}.")
                     break
 
-                # 2. On récupère toutes les cartes de la page
+                # Récupération de toutes les cartes de la page
                 cards = driver.find_elements(By.CSS_SELECTOR, "li[data-testid='search-results-list-item-wrapper']")
                 
                 page_links = []
@@ -95,10 +95,11 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None):
                         # Note : Idéalement, on génère l'ID ici si les infos (titre/entreprise) 
                         # sont visibles dans la carte pour éviter le driver.get(link)
                         page_links.append(link)
-                    except:
+                    except Exception as e:
+                        logger.warning(f"Erreur lors de l'extraction du lien dans la carte : {e}")
                         continue
 
-                # 3. Scraping des détails
+                # Scraping des détails
                 for link in page_links:
                     if count_for_kw >= max_offres_per_kw:
                         break
@@ -117,12 +118,11 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None):
                         
                         job_id = hashlib.sha256(f"{company.lower()}|{title.lower()}|{location.lower()}".encode()).hexdigest()
 
-                        # --- VÉRIFICATION DÉDOUBLONNAGE ---
+                        # Vérification doublons 
                         if job_id in existing_ids:
                             logger.debug(f"Skipping : {title} (Déjà en base)")
                             continue
 
-                        # Extraction du reste des données (ta logique précédente...)
                         row = {
                             "id": job_id,
                             "title": title,
@@ -136,6 +136,7 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None):
                             "required_experience": None,
                             "contact": None,
                             "actualisation_date": None,
+                            "raw_json": json.dumps(job_data, ensure_ascii=False),  # JSON brut complet
                         }
 
                         all_data.append(row)
@@ -146,7 +147,7 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None):
                     except Exception as e:
                         logger.warning(f"Erreur sur {link}: {e}")
 
-                page += 1 # Incrémenter la page de recherche si on n'a pas atteint le quota
+                page += 1 # Incrémenter la page de recherche si on n'a pas atteint le quota d'offres souhaitées 
 
     finally:
         driver.quit()
@@ -180,6 +181,7 @@ def save_wttj_offers_to_db(db_session, offers: list):
                 contract_type=offer_data.get("contract_type"),
                 required_experience=offer_data.get("required_experience"),
                 contact=offer_data.get("contact"),
+                raw_json=offer_data.get("raw_json"),
             )
             db_session.add(new_offer)
             new_offers_count += 1
@@ -198,7 +200,7 @@ def save_wttj_offers_to_db(db_session, offers: list):
     return new_offers_count
 
 
-def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False):
+def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False, headless=True):
     """
     Orchestrateur du scraping WTTJ - même pattern que run_collector().
     
@@ -206,6 +208,7 @@ def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False):
         keywords_to_fetch: Liste des mots-clés à rechercher
         max_offres_per_kw: Nombre max d'offres par mot-clé
         save_to_db: Si True, insère les offres en base de données
+        headless: Si True, le navigateur est invisible. Si False, on voit le scraping en temps réel.
     
     Returns:
         Liste des offres scrapées
@@ -219,20 +222,21 @@ def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False):
     scraped_offers = []
 
     try:
-        # 1. Lancement du scraping
+        # Lancement du scraping
         scraped_offers = scrape_wttj_json_strategy(
             keywords=keywords_to_fetch,
             max_offres_per_kw=max_offres_per_kw,
-            db_session=db
+            db_session=db,
+            headless=headless
         )
 
-        # 2. Synthèse
+        # Synthèse
         if scraped_offers:
             logger.success(f"Scraping terminé : {len(scraped_offers)} nouvelles offres trouvées.")
             for offer in scraped_offers[:3]:  # Affiche les 3 premières
                 logger.info(f"  → {offer['title']} chez {offer['company']}")
             
-            # 3. Insertion en BDD si demandé
+            # Insertion éventuelle en BDD 
             if save_to_db:
                 save_wttj_offers_to_db(db, scraped_offers)
         else:
@@ -250,7 +254,13 @@ def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False):
 if __name__ == "__main__":
     
     # Test avec insertion en base de données
-    keywords_to_test = ["Machine Learning"]
-    offers = run_wttj_scraper(keywords_to_test, max_offres_per_kw=3, save_to_db=True)
+    # headless=False permet de voir le navigateur en action
+    keywords_to_test = ["data scientist back market"]
+    offers = run_wttj_scraper(
+        keywords_to_test, 
+        max_offres_per_kw=3, 
+        save_to_db=True, 
+        headless=False  
+    )
     
     print(f"\nRésultat : {len(offers)} offres traitées")
