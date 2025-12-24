@@ -33,20 +33,20 @@ def clean_description(html_text: str) -> str:
     if not html_text:
         return ""
     
-    # 1. Suppression des balises HTML
+    # Suppression des balises HTML
     soup = BeautifulSoup(html_text, "html.parser")
     text = soup.get_text(separator=" ")
     
-    # 2. Normalisation Unicode (accents, caractères spéciaux)
+    # Normalisation Unicode (accents, caractères spéciaux)
     text = unicodedata.normalize("NFKC", text)
     
-    # 3. Suppression des caractères de contrôle et non-imprimables
+    # Suppression des caractères de contrôle et non-imprimables
     text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
     
-    # 4. Garde lettres, chiffres, ponctuations de base et espaces
+    # Garde lettres, chiffres, ponctuations de base et espaces
     text = re.sub(r'[^\w\s\.,;:\-\(\)@\'"&]', ' ', text, flags=re.UNICODE)
     
-    # 5. Nettoyage des espaces multiples
+    # Nettoyage des espaces multiples
     text = re.sub(r'\s+', ' ', text)
     
     return text.strip()
@@ -111,7 +111,7 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, h
                         script_element = driver.find_element(By.XPATH, "//script[@type='application/ld+json']")
                         job_data = json.loads(script_element.get_attribute("innerHTML"))
                         
-                        # Génération de l'ID déterministe
+                        # Génération d'un ID déterministe
                         company = job_data.get("hiringOrganization", {}).get("name", "Inconnu")
                         title = job_data.get("title", "Sans titre")
                         location = job_data.get("jobLocation", [{}])[0].get("address", {}).get("addressLocality", "N/C")
