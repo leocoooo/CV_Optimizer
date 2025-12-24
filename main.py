@@ -1,7 +1,7 @@
 from loguru import logger
 from src.services.cv_reader import CVReader
 from src.services.matcher import JobMatcher
-from src.services.advisor import JobAdvisor  # Nouveau service
+from src.services.llm_advisor import JobAdvisor  # Nouveau service
 
 def orchestrate_matching(cv_path: str):
     """
