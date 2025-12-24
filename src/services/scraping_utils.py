@@ -6,10 +6,42 @@ Single source of truth pour les fonctions communes.
 import sys
 import re
 import unicodedata
+from datetime import datetime
 from loguru import logger
 from bs4 import BeautifulSoup
 
 from src.database.models import JobOffer
+
+
+def parse_date(date_str: str):
+    """
+    Parse une date depuis différents formats possibles.
+    
+    Args:
+        date_str: Date en string (ex: "22/12/2025", "2025-12-22T10:30:00Z")
+    
+    Returns:
+        datetime object ou None si parsing échoue
+    """
+    if not date_str:
+        return None
+    
+    # Liste des formats possibles
+    formats = [
+        "%d/%m/%Y",           # HelloWork: 22/12/2025
+        "%Y-%m-%dT%H:%M:%SZ", # WTTJ ISO: 2025-12-22T10:30:00Z
+        "%Y-%m-%d",           # Simple: 2025-12-22
+        "%d-%m-%Y",           # Alternatif: 22-12-2025
+    ]
+    
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    
+    logger.debug(f"Format de date non reconnu : {date_str}")
+    return None
 
 
 def setup_logger(level: str = "DEBUG"):
@@ -53,20 +85,20 @@ def clean_description(html_text: str) -> str:
     if not html_text:
         return ""
     
-    # 1. Suppression des balises HTML
+    # Suppression des balises HTML
     soup = BeautifulSoup(html_text, "html.parser")
     text = soup.get_text(separator=" ")
     
-    # 2. Normalisation Unicode (accents, caractères spéciaux)
+    # Normalisation Unicode (accents, caractères spéciaux)
     text = unicodedata.normalize("NFKC", text)
     
-    # 3. Suppression des caractères de contrôle et non-imprimables
+    # Suppression des caractères de contrôle et non-imprimables
     text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
     
-    # 4. Garde lettres, chiffres, ponctuations de base et espaces
+    # Garde lettres, chiffres, ponctuations de base et espaces
     text = re.sub(r'[^\w\s\.,;:\-\(\)@\'"&]', ' ', text, flags=re.UNICODE)
     
-    # 5. Nettoyage des espaces multiples
+    # Nettoyage des espaces multiples
     text = re.sub(r'\s+', ' ', text)
     
     return text.strip()
@@ -93,6 +125,15 @@ def save_offers_to_db(db_session, offers: list, source_name: str = "Scraping") -
     
     for offer_data in offers:
         try:
+            # Parse les dates si elles sont en string
+            creation_date = offer_data.get("creation_date")
+            if isinstance(creation_date, str):
+                creation_date = parse_date(creation_date)
+            
+            actualisation_date = offer_data.get("actualisation_date")
+            if isinstance(actualisation_date, str):
+                actualisation_date = parse_date(actualisation_date)
+            
             new_offer = JobOffer(
                 id=offer_data["id"],
                 title=offer_data["title"],
@@ -101,8 +142,8 @@ def save_offers_to_db(db_session, offers: list, source_name: str = "Scraping") -
                 description=offer_data["description"],
                 url=offer_data["url"],
                 source=offer_data["source"],
-                creation_date=offer_data.get("creation_date"),
-                actualisation_date=offer_data.get("actualisation_date"),
+                creation_date=creation_date,
+                actualisation_date=actualisation_date,
                 contract_type=offer_data.get("contract_type"),
                 required_experience=offer_data.get("required_experience"),
                 contact=offer_data.get("contact"),

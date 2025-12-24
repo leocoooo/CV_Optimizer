@@ -18,15 +18,15 @@ def clean_description(html_text: str) -> str:
     if not html_text:
         return ""
     
-    # 1. Suppression du HTML avec BeautifulSoup
+    # Suppression du HTML avec BeautifulSoup
     soup = BeautifulSoup(html_text, "html.parser")
     text = soup.get_text(separator=" ") # On remplace les balises par un espace
     
-    # 2. Nettoyage des espaces multiples et des retours à la ligne
+    # Nettoyage des espaces multiples et des retours à la ligne
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     cleaned_text = " ".join(lines)
     
-    # 3. Suppression des espaces doubles résiduels
+    # Suppression des espaces doubles résiduels
     return " ".join(cleaned_text.split())
 
 def save_offers_to_db(db: Session, offers_json: list):
@@ -105,7 +105,5 @@ def run_collector(keywords_to_fetch):
 
 if __name__ == "__main__":
 
-    keywords_to_fetch = [
-        "Data Scientist", "Data Analyst", "Data Engineer"
-    ]
+    keywords_to_fetch = ["Data Scientist"]
     run_collector(keywords_to_fetch)
