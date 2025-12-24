@@ -1,11 +1,7 @@
-import sys
 import time
 import json
 import hashlib
-import re
-import unicodedata
 from loguru import logger
-from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -15,41 +11,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
 from src.database.database import SessionLocal
-from src.database.models import JobOffer
+from src.services.scraping_utils import setup_logger, get_existing_ids, clean_description, save_offers_to_db
 
-logger.remove()
-logger.add(sys.stderr, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>", level="DEBUG")
-
-def get_existing_ids(db_session):
-    """Récupère les IDs déjà présents en base pour éviter le double scrap."""
-    return {offer.id for offer in db_session.query(JobOffer.id).all()}
-
-
-def clean_description(html_text: str) -> str:
-    """
-    Nettoie la description HTML pour ne garder que le contenu textuel utile.
-    Combine la suppression HTML (BeautifulSoup) + nettoyage Unicode (comme cv_reader).
-    """
-    if not html_text:
-        return ""
-    
-    # Suppression des balises HTML
-    soup = BeautifulSoup(html_text, "html.parser")
-    text = soup.get_text(separator=" ")
-    
-    # Normalisation Unicode (accents, caractères spéciaux)
-    text = unicodedata.normalize("NFKC", text)
-    
-    # Suppression des caractères de contrôle et non-imprimables
-    text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
-    
-    # Garde lettres, chiffres, ponctuations de base et espaces
-    text = re.sub(r'[^\w\s\.,;:\-\(\)@\'"&]', ' ', text, flags=re.UNICODE)
-    
-    # Nettoyage des espaces multiples
-    text = re.sub(r'\s+', ' ', text)
-    
-    return text.strip()
+# Configuration du logger
+setup_logger(level="DEBUG")
 
 
 def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, headless=True):
@@ -155,51 +120,6 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, h
     return all_data
 
 
-def save_wttj_offers_to_db(db_session, offers: list):
-    """
-    Persiste les offres scrapées en base de données.
-    Pattern identique à save_offers_to_db() dans collector.py.
-    """
-    if not offers:
-        logger.info("Aucune offre à insérer.")
-        return 0
-    
-    new_offers_count = 0
-    
-    for offer_data in offers:
-        try:
-            new_offer = JobOffer(
-                id=offer_data["id"],
-                title=offer_data["title"],
-                company=offer_data["company"],
-                location=offer_data["location"],
-                description=offer_data["description"],
-                url=offer_data["url"],
-                source=offer_data["source"],
-                creation_date=offer_data.get("creation_date"),
-                actualisation_date=offer_data.get("actualisation_date"),
-                contract_type=offer_data.get("contract_type"),
-                required_experience=offer_data.get("required_experience"),
-                contact=offer_data.get("contact"),
-                raw_json=offer_data.get("raw_json"),
-            )
-            db_session.add(new_offer)
-            new_offers_count += 1
-        except Exception as e:
-            logger.warning(f"Erreur lors de la préparation de l'offre {offer_data.get('title')}: {e}")
-    
-    try:
-        db_session.commit()
-        if new_offers_count > 0:
-            logger.success(f"Insertion : {new_offers_count} nouvelles offres WTTJ ajoutées en base.")
-    except Exception as e:
-        db_session.rollback()
-        logger.error(f"Erreur lors de l'insertion en base : {e}")
-        return 0
-    
-    return new_offers_count
-
-
 def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False, headless=True):
     """
     Orchestrateur du scraping WTTJ - même pattern que run_collector().
@@ -238,7 +158,7 @@ def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False, 
             
             # Insertion éventuelle en BDD 
             if save_to_db:
-                save_wttj_offers_to_db(db, scraped_offers)
+                save_offers_to_db(db, scraped_offers, source_name="WTTJ")
         else:
             logger.info("Aucune nouvelle offre à traiter.")
 
