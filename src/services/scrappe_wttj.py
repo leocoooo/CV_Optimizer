@@ -72,6 +72,7 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, h
                     try:
                         driver.get(link)
                         time.sleep(2) # Temps de chargement JSON-LD
+                        driver.execute_script("window.scrollTo(0, 500);") # Scroll pour charger les éléments
                         
                         script_element = driver.find_element(By.XPATH, "//script[@type='application/ld+json']")
                         job_data = json.loads(script_element.get_attribute("innerHTML"))
@@ -88,6 +89,35 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, h
                             logger.debug(f"Skipping : {title} (Déjà en base)")
                             continue
 
+                        # expérience requise
+                        required_experience = None
+                        try:
+                            element = driver.find_element(By.XPATH, "//span[contains(text(), 'Expérience :')]/parent::div")
+                            full_text = element.text
+                            if "Expérience :" in full_text:
+                                required_experience = full_text.split("Expérience :")[-1].strip()
+                            else:
+                                required_experience = full_text.strip()
+                        except Exception:
+                            required_experience = None
+
+                        #  contrat 
+                        contract_type = None
+                        try:
+                            contract_element = driver.find_element(By.XPATH, "//i[@name='contract']/parent::div")
+                            contract_type = contract_element.text.strip()
+                        except Exception:
+                            # Fallback sur la valeur JSON-LD
+                            contract_type = job_data.get("employmentType")
+
+                        #  compétences
+                        competences = None
+                        try:
+                            skills = driver.find_elements(By.CSS_SELECTOR, "div.sc-fibHhp.jdfMTT span")
+                            competences = ", ".join([s.text for s in skills if s.text]) if skills else None
+                        except Exception:
+                            competences = None
+
                         row = {
                             "id": job_id,
                             "title": title,
@@ -97,8 +127,10 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, h
                             "source": "Welcome to the Jungle",
                             "description": clean_description(job_data.get("description")),
                             "creation_date": job_data.get("datePosted"),
-                            "contract_type": job_data.get("employmentType"),
-                            "required_experience": None,
+                            "contract_type": contract_type,
+                            # "contract_type" : job_data.get("employmentType"),
+                            "required_experience": required_experience,
+                            "competences": competences,
                             "contact": None,
                             "actualisation_date": None,
                             "raw_json": json.dumps(job_data, ensure_ascii=False),  # JSON brut complet
@@ -108,7 +140,6 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, h
                         existing_ids.add(job_id) # Ajout au set pour éviter les doublons inter-mots-clés
                         count_for_kw += 1
                         logger.info(f"[{count_for_kw}/{max_offres_per_kw}] Scrapé : {title}")
-
                     except Exception as e:
                         logger.warning(f"Erreur sur {link}: {e}")
 
