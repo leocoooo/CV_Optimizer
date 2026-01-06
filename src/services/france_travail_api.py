@@ -1,6 +1,7 @@
 import os
 import httpx
 from dotenv import load_dotenv
+from loguru import logger
 
 load_dotenv()
 
@@ -24,8 +25,8 @@ class FranceTravailAPI:
         
         response = httpx.post(self.auth_url, data=data, headers=headers, timeout=10.0)        
         if response.status_code != 200:
-            print(f"Erreur Auth : {response.status_code}")
-            print(f"Détail : {response.text}")
+            logger.error(f"Erreur Auth : {response.status_code}")
+            logger.error(f"Détail : {response.text}")
             response.raise_for_status()
             
         self.access_token = response.json().get("access_token")
@@ -53,14 +54,14 @@ class FranceTravailAPI:
             
             # Si le token a expiré (401), on le renouvelle et on réessaye une fois
             if response.status_code == 401:
-                print("Token expiré, renouvellement en cours...")
+                logger.warning("Token expiré, renouvellement en cours...")
                 self._get_access_token()
                 return self.fetch_offers(keywords, range_str)
 
             # Vérification des erreurs (403, 400, etc.)
             if response.status_code not in [200, 206]:
-                print(f"Erreur API {response.status_code}")
-                print(f"Réponse brute : {response.text[:250]}")
+                logger.error(f"Erreur API {response.status_code}")
+                logger.error(f"Réponse brute : {response.text[:250]}")
                 return []
 
             # L'API renvoie un dictionnaire contenant une liste sous la clé 'resultats'
@@ -69,17 +70,17 @@ class FranceTravailAPI:
             return data.get("resultats", []) if data else []
         
         except Exception as e:
-            print(f"Erreur lors de la requête : {e}")
+            logger.error(f"Erreur lors de la requête : {e}")
             return []
 
 if __name__ == "__main__":
     # Test du module
     ft_api = FranceTravailAPI()
-    print("Test de récupération des offres...")
+    logger.info("Test de récupération des offres...")
     offers = ft_api.fetch_offers(keywords="Data", range_str="0-19")
     
-    print(f"{len(offers)} offres récupérées.")
+    logger.success(f"{len(offers)} offres récupérées.")
     
     if offers:
-        print(f"Titre de la première offre : {offers[0].get('intitule')}")
-        print(f"Entreprise : {offers[0].get('entreprise', {}).get('nom', 'Non spécifiée')}")
+        logger.info(f"Titre de la première offre : {offers[0].get('intitule')}")
+        logger.info(f"Entreprise : {offers[0].get('entreprise', {}).get('nom', 'Non spécifiée')}")
