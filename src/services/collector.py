@@ -71,9 +71,13 @@ def save_offers_to_db(db: Session, offers_json: list):
         db.rollback()
         logger.exception(f"Erreur critique lors de l'insertion en base : {e}")
 
-def run_collector(keywords_to_fetch):
+def run_collector(keywords_to_fetch, max_offers=50):
     """
     Orchestrateur de la collecte de données.
+    
+    Args:
+        keywords_to_fetch: Liste de mots-clés
+        max_offers: Nombre maximum d'offres par mot-clé (défaut: 50)
     """
 
     if not keywords_to_fetch:
@@ -84,13 +88,15 @@ def run_collector(keywords_to_fetch):
     db = SessionLocal()
 
     logger.info("Démarrage du cycle de collecte CV-Optimizer")
+    logger.info(f"Max {max_offers} offres par mot-clé")
 
     try:
         for kw in keywords_to_fetch:
             logger.info(f"Recherche en cours pour : {kw}")
             
-            # Récupération des offres via le service API
-            offers = api.fetch_offers(keywords=kw, range_str="0-49")
+            # Récupération des offres via le service API avec limite dynamique
+            range_end = max_offers - 1
+            offers = api.fetch_offers(keywords=kw, range_str=f"0-{range_end}")
             
             if offers:
                 save_offers_to_db(db, offers)
