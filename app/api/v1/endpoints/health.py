@@ -10,7 +10,6 @@ from sqlalchemy import text
 
 from app.schemas.common import HealthResponse, StatusResponse
 from app.api.deps import get_db
-from app.config import settings
 
 
 router = APIRouter()
