@@ -29,7 +29,7 @@ def scrape_hellowork_safe(keywords, max_pages=29):
         try:
             WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, "//span[text()='Tout accepter']"))).click()
             time.sleep(1)
-        except:  
+        except Exception:  
             pass
 
         for kw in keywords:
@@ -41,7 +41,7 @@ def scrape_hellowork_safe(keywords, max_pages=29):
                 time.sleep(0.5)
                 search_input.send_keys(Keys.ENTER)
                 time.sleep(2)
-            except: 
+            except Exception: 
                 continue
 
             for page in range(1, max_pages + 1):
@@ -49,7 +49,7 @@ def scrape_hellowork_safe(keywords, max_pages=29):
                     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[data-cy='offerTitle']")))
                     offer_elements = driver.find_elements(By.CSS_SELECTOR, "a[data-cy='offerTitle']")
                     links = [el.get_attribute("href") for el in offer_elements]
-                except: 
+                except Exception: 
                     break
 
                 for link in links:
@@ -80,7 +80,7 @@ def scrape_hellowork_safe(keywords, max_pages=29):
                         row["title"] = driver.find_element(By.CSS_SELECTOR, "[data-cy='jobTitle']").text
                         try: 
                             row["company"] = driver.find_element(By.CSS_SELECTOR, "p.tw-typo-s.tw-inline").text
-                        except: 
+                        except Exception: 
                             pass
                         
                         try:
@@ -89,7 +89,7 @@ def scrape_hellowork_safe(keywords, max_pages=29):
                             match_date = re.search(r'(\d{2}/\d{2}/\d{4})', date_text)
                             if match_date:
                                 row["creation_date"] = match_date.group(1)
-                        except Exception as e:
+                        except Exception:
                             row["creation_date"] = "N/A"
 
                         # Tags (Contract, Experience, Location)
@@ -101,13 +101,14 @@ def scrape_hellowork_safe(keywords, max_pages=29):
                             elif val in ["CDI", "CDD", "Alternance", "Stage", "Intérim"]: 
                                 row["contract_type"] = val
                             else: 
-                                if row["location"] == "N/A": row["location"] = val
+                                if row["location"] == "N/A": 
+                                    row["location"] = val
 
                         # Description
                         try:
                             desc = driver.find_element(By.CSS_SELECTOR, "div[data-truncate-text-target='content']")
                             row["description"] = " ".join(desc.text.split())
-                        except: 
+                        except Exception: 
                             pass
 
                         # Skills
@@ -122,7 +123,7 @@ def scrape_hellowork_safe(keywords, max_pages=29):
                                 row["description"] = row["description"] + " " + competences_text
                             else:
                                 row["description"] = competences_text
-                        except: 
+                        except Exception: 
                             pass
 
                         all_data.append(row)
@@ -141,7 +142,7 @@ def scrape_hellowork_safe(keywords, max_pages=29):
                     next_btn = driver.find_element(By.CSS_SELECTOR, f"button[name='p'][value='{next_page_val}']")
                     driver.execute_script("arguments[0].click();", next_btn)
                     time.sleep(2) 
-                except: 
+                except Exception: 
                     break
 
     finally:

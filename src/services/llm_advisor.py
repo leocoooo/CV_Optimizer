@@ -1,18 +1,14 @@
-import os
 from huggingface_hub import InferenceClient
 from src.database.database import SessionLocal
 from src.database.models import JobOffer
-from dotenv import load_dotenv
+from app.config import get_settings
 from loguru import logger
-
-load_dotenv()
 
 class JobAdvisor:
     def __init__(self):
-        # On récupère le token API
-        api_key = os.getenv("HUGGINGFACE_API_KEY")
-        if not api_key:
-            raise ValueError("HUGGINGFACE_API_KEY manquante dans le fichier .env")
+        # On récupère le token API depuis la configuration
+        settings = get_settings()
+        api_key = settings.HUGGINGFACE_API_KEY
         
         self.model_id = "Qwen/Qwen2.5-7B-Instruct"
         

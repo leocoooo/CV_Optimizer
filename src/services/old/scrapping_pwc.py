@@ -15,7 +15,8 @@ from bs4 import BeautifulSoup
 def extract_json_stricte(text):
     """Extrait le JSON en coupant les caractères parasites à la fin."""
     start_idx = text.find('{')
-    if start_idx == -1: return None
+    if start_idx == -1: 
+        return None
     text = text[start_idx:]
     for i in range(len(text), 0, -1):
         try:
@@ -46,7 +47,8 @@ def scrape_pwc_massive(keywords):
             # Cookies (attente courte si déjà accepté)
             try:
                 WebDriverWait(driver, 3).until(EC.element_to_be_clickable((By.ID, "axeptio_btn_acceptAll"))).click()
-            except: pass
+            except Exception: 
+                pass
 
             # Formulaire
             try:
@@ -113,15 +115,15 @@ def scrape_pwc_massive(keywords):
                             
                             pd.DataFrame(all_data).to_csv(nom_fichier, index=False, encoding='utf-8-sig')
                 except Exception as e:
-                    print(f"   ∟ ⚠️ Erreur : {e}")
+                    print(f"   ∟ Erreur : {e}")
 
-    finally:a
+    finally:
         driver.quit()
-        print(f"\n📊 Scraping terminé ! Total d'offres uniques PwC : {len(all_data)}")
-        print(f"📂 Fichier disponible : {os.path.abspath(nom_fichier)}")
+        print(f"\nScraping terminé ! Total d'offres uniques PwC : {len(all_data)}")
+        print(f" Fichier disponible : {os.path.abspath(nom_fichier)}")
 
 if __name__ == "__main__":
-    keywords_glist = [
+    keywords_list = [
         "Data Scientist", "Data Analyst", "Data Engineer", "Machine Learning Engineer",
         "Architecte Big Data", "Business Intelligence", "Data Manager",
         "Développeur Python", "Développeur Fullstack", "Développeur Backend",

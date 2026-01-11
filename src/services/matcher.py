@@ -3,17 +3,26 @@ from src.database.database import SessionLocal
 from src.services.embedder import Embedder
 from loguru import logger
 from datetime import datetime, timedelta
+from app.config import get_settings
+
+settings = get_settings()
 
 class JobMatcher:
     def __init__(self):
         self.embedder = Embedder()
         self.db = SessionLocal()
 
-    def find_matches(self, profile_text: str, days_limit: int = 30, top_n: int = 5, location: str = None, contract_type: str = None, experience: str = None):
+    def find_matches(self, profile_text: str, days_limit: int = None, top_n: int = None, location: str = None, contract_type: str = None, experience: str = None):
         """
         Prend un texte (CV/Profil) et retourne les N offres les plus pertinentes
         en appliquant des filtres stricts si fournis.
         """
+        # Utiliser les valeurs par défaut si non fournies
+        if days_limit is None:
+            days_limit = settings.DEFAULT_DAYS_LIMIT
+        if top_n is None:
+            top_n = settings.DEFAULT_TOP_N
+            
         logger.info("Génération du vecteur pour le profil utilisateur...")
         profile_vector = self.embedder.get_embedding(profile_text)
         

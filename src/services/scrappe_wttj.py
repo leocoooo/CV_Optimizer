@@ -17,7 +17,7 @@ from src.services.scraping_utils import setup_logger, get_existing_ids, clean_de
 setup_logger(level="DEBUG")
 
 
-def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, headless=True):
+def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, headless=None):
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
     if headless:
@@ -151,7 +151,7 @@ def scrape_wttj_json_strategy(keywords, max_offres_per_kw=10, db_session=None, h
     return all_data
 
 
-def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False, headless=True):
+def run_wttj_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False, headless=None):
     """
     Orchestrateur du scraping WTTJ - même pattern que run_collector().
     

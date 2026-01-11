@@ -18,7 +18,7 @@ from src.services.scraping_utils import setup_logger, get_existing_ids, clean_de
 setup_logger(level="DEBUG")
 
 
-def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=True):
+def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=None):
     """
     Scrape les offres HelloWork pour les mots-clés donnés.
     
@@ -99,7 +99,7 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=T
                     
                     # Vérification doublons AVANT d'aller sur la page
                     if job_id in existing_ids:
-                        logger.info(f"⏭️  Skipping ID {job_id} (Déjà en base)")
+                        logger.info(f"Skipping ID {job_id} (Déjà en base)")
                         continue
 
                     driver.get(link)
@@ -160,7 +160,7 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=T
                             time.sleep(0.5)
                             profil_content = driver.find_element(By.CSS_SELECTOR, "#collapsed-content p.tw-typo-long-m")
                             description_text += " " + profil_content.text
-                        except:
+                        except Exception:
                             pass
 
                         raw_data["description"] = description_text
@@ -209,7 +209,7 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=T
     return all_data
 
 
-def run_hw_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False, headless=True):
+def run_hw_scraper(keywords_to_fetch, max_offres_per_kw=10, save_to_db=False, headless=None):
     """
     Orchestrateur du scraping HelloWork - même pattern que run_wttj_scraper().
     

@@ -1,6 +1,5 @@
 import sys
 from loguru import logger
-from sqlalchemy.orm import Session
 from src.database.database import SessionLocal
 from src.database.models import JobOffer
 from src.services.embedder import Embedder

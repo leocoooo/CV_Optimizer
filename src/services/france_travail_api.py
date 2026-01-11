@@ -1,14 +1,12 @@
-import os
 import httpx
-from dotenv import load_dotenv
+from app.config import get_settings
 from loguru import logger
-
-load_dotenv()
 
 class FranceTravailAPI:
     def __init__(self):
-        self.client_id = os.getenv("FT_CLIENT_ID")
-        self.client_secret = os.getenv("FT_CLIENT_SECRET")
+        settings = get_settings()
+        self.client_id = settings.FT_CLIENT_ID
+        self.client_secret = settings.FT_CLIENT_SECRET
         self.auth_url = "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire"
         self.base_url = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
         self.access_token = None

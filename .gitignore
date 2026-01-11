@@ -1,6 +1,10 @@
 .venv
 *.txt
 .env
-__pycache__/
+pycache/
+src/database/pycache/
+src/services/pycache/
 *.pyc
 data/scrapping/
+explanation_API/
+data/.DS_Store

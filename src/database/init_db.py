@@ -1,15 +1,14 @@
-import os
 from sqlalchemy import create_engine, text
 from sqlalchemy_utils import database_exists, create_database
 from loguru import logger
-from dotenv import load_dotenv
+from app.config import get_settings
 
 # NE PAS MODIFIER : C'est ici que SQLAlchemy découvre les tables
 from src.database.database import Base
-from src.database.models import JobOffer 
+from src.database.models import JobOffer # noqa
 
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+settings = get_settings()
+DATABASE_URL = settings.DATABASE_URL
 
 def init_db():
     engine = create_engine(DATABASE_URL)
