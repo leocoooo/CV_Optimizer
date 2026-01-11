@@ -13,6 +13,7 @@ from loguru import logger
 from app.api.v1.router import api_router
 from app.config import get_settings
 
+
 # Récupération de la configuration
 settings = get_settings()
 
@@ -32,9 +33,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.DEBUG}")
     logger.info(f"Database: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else 'configured'}")
     logger.info(f"CORS origins: {settings.ALLOWED_ORIGINS}")
-
+    
     yield
-
+    
     # Shutdown
     uptime = time.time() - _start_time
     logger.info(f"Arrêt de CV-Optimizer API (uptime: {uptime:.2f}s)")
@@ -73,6 +74,7 @@ Cette API permet de :
     lifespan=lifespan,
 )
 
+
 # CORS - Autorisation des requêtes cross-origin (pour un futur  front-end)
 app.add_middleware(
     CORSMiddleware,
@@ -88,9 +90,10 @@ app.add_middleware(
 # Inclusion du router principal v1
 app.include_router(api_router)
 
+
 if __name__ == "__main__":
     import uvicorn
-
+    
     logger.info("Démarrage du serveur Uvicorn...")
     uvicorn.run(
         "app.main:app",
