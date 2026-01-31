@@ -28,7 +28,7 @@ async def root():
         "message": "Bienvenue sur CV-Optimizer API",
         "documentation": "/docs",
         "health": "/health",
-        "status": "/api/v1/status"
+        "status": "/api/status"
     }
 
 
@@ -56,7 +56,7 @@ async def health_check():
 
 
 @router.get(
-    "/api/v1/status",
+    "/api/status",
     response_model=StatusResponse,
     tags=["Health"],
     summary="Statut détaillé de l'API",

@@ -60,7 +60,7 @@ async def collect_jobs(
     
     **Exemple** :
     ```bash
-    curl -X POST "http://localhost:8000/api/v1/admin/collect" \\
+    curl -X POST "http://localhost:8000/api/admin/collect" \\
       -H "X-API-Key: votre-cle-admin" \\
       -H "Content-Type: application/json" \\
       -d '{"keywords": ["Data Scientist", "ML Engineer"], "max_offers": 20}'
@@ -167,7 +167,7 @@ async def reindex_embeddings(
     
     **Exemple** :
     ```bash
-    curl -X POST "http://localhost:8000/api/v1/admin/reindex" \\
+    curl -X POST "http://localhost:8000/api/admin/reindex" \\
       -H "X-API-Key: votre-cle-admin"
     ```
     
