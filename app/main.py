@@ -75,7 +75,7 @@ Cette API permet de :
 )
 
 
-# CORS - Autorisation des requêtes cross-origin (pour un futur  front-end)
+# CORS - Autorisation des requêtes cross-origin (pour un futur front-end)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -83,9 +83,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Gestion des exceptions
-
 
 # Inclusion du router principal
 app.include_router(api_router)
@@ -99,6 +96,6 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,  # Hot reload en développement
+        reload=True,
         log_level="info",
     )

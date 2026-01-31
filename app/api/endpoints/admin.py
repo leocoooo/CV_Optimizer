@@ -87,11 +87,11 @@ async def collect_jobs(
     # Fonction de collecte complète (exécutée en arrière-plan)
     async def run_collection():
         try:
-            # 1. API France Travail
+            # API France Travail
             logger.info("Collecte API France Travail...")
             await run_in_thread(run_collector, keywords, max_offers)
             
-            # 2. Scraping HelloWork (optionnel)
+            # Scraping HelloWork : optionnel
             if enable_scraping:
                 logger.info(f"Démarrage scraping HelloWork ({max_offers} offres/mot-clé)...")
                 await run_in_thread(
@@ -103,7 +103,7 @@ async def collect_jobs(
                 )
                 logger.success(" Scraping HelloWork terminé")
             
-            # 3. Scraping Welcome to the Jungle (optionnel)
+            # Scraping Welcome to the Jungle : optionnel
             if enable_scraping:
                 logger.info(f" Démarrage scraping Welcome to the Jungle ({max_offers} offres/mot-clé)...")
                 await run_in_thread(
@@ -115,7 +115,7 @@ async def collect_jobs(
                 )
                 logger.success(" Scraping Welcome to the Jungle terminé")
             
-            # 4. Génération des embeddings pour les nouvelles offres
+            # Génération des embeddings pour les nouvelles offres
             logger.info(" Génération des embeddings...")
             await run_in_thread(process_embeddings)
             

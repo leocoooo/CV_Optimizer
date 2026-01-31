@@ -8,16 +8,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Configuration de l'API """
-    
-    # Database (obligatoire)
+    # Params obligatoires à définir dans .env :
+
+    # Database 
     DATABASE_URL: str
-    
-    # API Keys externes (obligatoires)
+    # API Keys externes 
     HUGGINGFACE_API_KEY: str
     FT_CLIENT_ID: str
     FT_CLIENT_SECRET: str
-    
-    # Security (obligatoire)
+    # Security 
     API_KEY_ADMIN: str    
     
     # Constantes nécessaires pour l'app (valeurs par défaut)
@@ -28,7 +27,7 @@ class Settings(BaseSettings):
     LLM_TIMEOUT_SECONDS: int = 60
     
     # Matching
-    DEFAULT_TOP_N: int = 10  # Résultats par défaut
+    DEFAULT_TOP_N: int = 10 
     MAX_TOP_N: int = 50  # Maximum autorisé
     DEFAULT_DAYS_LIMIT: int = 30
     
