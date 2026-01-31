@@ -61,7 +61,7 @@ async def match_cv(
     
     **Exemple d'utilisation** :
     ```bash
-    curl -X POST "http://localhost:8000/api/v1/match" \\
+    curl -X POST "http://localhost:8000/api/match" \\
       -F "file=@mon_cv.pdf" \\
       -F "location=Paris" \\
       -F "contract_type=CDI" \\

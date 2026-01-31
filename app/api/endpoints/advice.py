@@ -54,7 +54,7 @@ async def get_cv_advice(
     
     **Exemple d'utilisation** :
     ```bash
-    curl -X POST "http://localhost:8000/api/v1/advice" \\
+    curl -X POST "http://localhost:8000/api/advice" \\
       -F "file=@mon_cv.pdf" \\
       -F "job_id=123456"
     ```
@@ -81,7 +81,7 @@ async def get_cv_advice(
     if not offer:
         raise JobNotFoundError(
             job_id=job_id,
-            detail={"hint": "Utilisez /api/v1/match pour trouver des offres"}
+            detail={"hint": "Utilisez /api/match pour trouver des offres"}
         )
     
     logger.info(f"Offre trouvée : {offer.title} chez {offer.company}")

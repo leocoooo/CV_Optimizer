@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from app.api.v1.router import api_router
+from app.api.router import api_router
 from app.config import get_settings
 
 
@@ -61,7 +61,7 @@ Cette API permet de :
 
 ### Authentication
 - Endpoints publics : Aucune authentification requise
-- Endpoints admin (`/api/v1/admin/*`) : Header `X-API-Key` requis
+- Endpoints admin (`/api/admin/*`) : Header `X-API-Key` requis
 
 ### Rate Limiting
 - Limite globale : 60 requêtes/minute (configurable)
@@ -87,7 +87,7 @@ app.add_middleware(
 # Gestion des exceptions
 
 
-# Inclusion du router principal v1
+# Inclusion du router principal
 app.include_router(api_router)
 
 

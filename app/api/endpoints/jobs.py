@@ -56,7 +56,7 @@ async def get_jobs(
     
     **Exemple d'utilisation** :
     ```bash
-    curl "http://localhost:8000/api/v1/jobs?location=Paris&contract_type=CDI&page=1&page_size=20"
+    curl "http://localhost:8000/api/jobs?location=Paris&contract_type=CDI&page=1&page_size=20"
     ```
     
     Args:
