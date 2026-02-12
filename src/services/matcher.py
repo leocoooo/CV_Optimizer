@@ -7,12 +7,21 @@ from app.config import get_settings
 
 settings = get_settings()
 
+
 class JobMatcher:
     def __init__(self):
         self.embedder = Embedder()
         self.db = SessionLocal()
 
-    def find_matches(self, profile_text: str, days_limit: int = None, top_n: int = None, location: str = None, contract_type: str = None, experience: str = None):
+    def find_matches(
+        self,
+        profile_text: str,
+        days_limit: int | None = None,
+        top_n: int | None = None,
+        location: str | None = None,
+        contract_type: str | None = None,
+        experience: str | None = None,
+    ):
         """
         Prend un texte (CV/Profil) et retourne les N offres les plus pertinentes
         en appliquant des filtres stricts si fournis.
@@ -22,19 +31,16 @@ class JobMatcher:
             days_limit = settings.DEFAULT_DAYS_LIMIT
         if top_n is None:
             top_n = settings.DEFAULT_TOP_N
-            
+
         logger.info("Génération du vecteur pour le profil utilisateur...")
         profile_vector = self.embedder.get_embedding(profile_text)
-        
+
         if not profile_vector:
             return []
 
         # 1. Construction dynamique de la clause WHERE
         filters = []
-        params = {
-            "vector": str(profile_vector),
-            "limit": top_n
-        }
+        params = {"vector": str(profile_vector), "limit": top_n}
 
         # Calcul de la date limite pour ne pas avoir des offres trop vieilles
         limit_date = datetime.now() - timedelta(days=days_limit)
@@ -44,7 +50,7 @@ class JobMatcher:
         if location:
             filters.append("location ILIKE :location")
             params["location"] = f"%{location}%"
-        
+
         if contract_type:
             filters.append("contract_type = :contract_type")
             params["contract_type"] = contract_type
@@ -65,7 +71,7 @@ class JobMatcher:
             ORDER BY similarity_score DESC
             LIMIT :limit
         """
-        
+
         query = text(query_str)
 
         logger.info(f"Recherche des {top_n} meilleures correspondances avec filtres...")
@@ -73,30 +79,32 @@ class JobMatcher:
 
         return results
 
+
 if __name__ == "__main__":
     matcher = JobMatcher()
-    
-    #  TEST 
+
+    #  TEST
     test_profile = """
     Je suis un jeune diplômé en Data Science, je maîtrise Python, 
     le machine learning avec scikit-learn et la manipulation de données avec Pandas.
     """
-    
+
     # Exemple d'utilisation avec filtres
     city_filter = "Paris"
-    contract_filter = "CDI" 
-    experience_level = "D" 
+    contract_filter = "CDI"
+    experience_level = "D"
 
-    
     matches = matcher.find_matches(
-        profile_text=test_profile, 
+        profile_text=test_profile,
         top_n=5,
         location=city_filter,
-        contract_type=contract_filter, 
-        experience=experience_level
+        contract_type=contract_filter,
+        experience=experience_level,
     )
-    
-    print(f"\n--- TOP MATCHES (Filtres: {city_filter}, {contract_filter}, {experience_level}) ---")
+
+    print(
+        f"\n--- TOP MATCHES (Filtres: {city_filter}, {contract_filter}, {experience_level}) ---"
+    )
     if not matches:
         print("Aucune offre ne correspond à ces critères stricts.")
     else:
@@ -104,5 +112,7 @@ if __name__ == "__main__":
             score = round(row.similarity_score * 100, 2)
             print(f"[{score}%] {row.title}")
             print(f"      Entreprise: {row.company} | Ville: {row.location}")
-            print(f"      Contrat: {row.contract_type} | Exp: {row.required_experience}\n")
+            print(
+                f"      Contrat: {row.contract_type} | Exp: {row.required_experience}\n"
+            )
             print(f"      Lien: {row.url} | ID: {row.id}\n")

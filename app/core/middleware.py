@@ -12,7 +12,7 @@ from app.config import settings
 def setup_cors(app):
     """
     Configure le middleware CORS pour autoriser les requêtes cross-origin.
-    
+
     Args:
         app: Instance FastAPI
     """
@@ -24,4 +24,3 @@ def setup_cors(app):
         allow_headers=["*"],  # Tous les headers autorisés
     )
     logger.info(f"CORS configuré pour : {settings.ALLOWED_ORIGINS}")
-

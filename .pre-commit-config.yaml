@@ -1,0 +1,22 @@
+# Configuration des hooks de pré-commit
+repos:
+  # Ruff : linting et formatage
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.10  
+    hooks:
+      - id: ruff
+        args: [ --fix ] 
+      - id: ruff-format
+
+  # Mypy : vérification statique des types
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+        # Optionnel : ajoutez des dépendances si mypy en a besoin pour analyser votre code
+        additional_dependencies:
+                  - pandas-stubs
+                  - "pymupdf>=1.23.0"
+                  - types-SQLAlchemy
+                  - types-requests
+                  - pydantic

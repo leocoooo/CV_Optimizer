@@ -31,11 +31,13 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Démarrage de CV-Optimizer API")
     logger.info(f"Environment: {settings.DEBUG}")
-    logger.info(f"Database: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else 'configured'}")
+    logger.info(
+        f"Database: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else 'configured'}"
+    )
     logger.info(f"CORS origins: {settings.ALLOWED_ORIGINS}")
-    
+
     yield
-    
+
     # Shutdown
     uptime = time.time() - _start_time
     logger.info(f"Arrêt de CV-Optimizer API (uptime: {uptime:.2f}s)")
@@ -90,7 +92,7 @@ app.include_router(api_router)
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     logger.info("Démarrage du serveur Uvicorn...")
     uvicorn.run(
         "app.main:app",
