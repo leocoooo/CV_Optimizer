@@ -30,16 +30,25 @@ router = APIRouter()
     tags=["Matching"],
     summary="Matcher un CV avec les offres",
     description="Upload un CV (PDF) et retourne les offres d'emploi les plus pertinentes.",
-    status_code=200
+    status_code=200,
 )
 async def match_cv(
     file: UploadFile = File(..., description="CV au format PDF (max 5 MB)"),
     location: Optional[str] = Form(None, description="Ville souhaitée"),
-    contract_type: Optional[str] = Form(None, description="Type de contrat (CDI, CDD, etc.)"),
+    contract_type: Optional[str] = Form(
+        None, description="Type de contrat (CDI, CDD, etc.)"
+    ),
     experience: Optional[str] = Form(None, description="Niveau d'expérience (D/E/S)"),
-    days_limit: Optional[int] = Form(settings.DEFAULT_DAYS_LIMIT, description="Limiter aux N derniers jours"),
-    top_n: int = Form(settings.DEFAULT_TOP_N, ge=1, le=settings.MAX_TOP_N, description="Nombre de résultats"),
-    db: Session = Depends(get_db)
+    days_limit: Optional[int] = Form(
+        settings.DEFAULT_DAYS_LIMIT, description="Limiter aux N derniers jours"
+    ),
+    top_n: int = Form(
+        settings.DEFAULT_TOP_N,
+        ge=1,
+        le=settings.MAX_TOP_N,
+        description="Nombre de résultats",
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     Matching CV/Offres avec recherche sémantique.
@@ -86,19 +95,17 @@ async def match_cv(
         NoMatchFoundError: Aucune offre correspondante
     """
     start_time = time.time()
-    
+
     logger.info(f"Upload du CV : {file.filename}")
-    
+
     # Lecture du contenu du fichier
     content = await file.read()
-    
+
     # Validation du fichier
     validate_file_upload(
-        filename=file.filename,
-        file_size=len(content),
-        content_type=file.content_type
+        filename=file.filename, file_size=len(content), content_type=file.content_type
     )
-    
+
     # Sanitization du nom de fichier
     safe_filename = sanitize_filename(file.filename)
     logger.info(f" Fichier validé : {safe_filename} ({len(content)} bytes)")
@@ -110,28 +117,28 @@ async def match_cv(
         contract_type = None
     if experience == "string":
         experience = None
-    
+
     # Création d'un fichier temporaire pour l'extraction
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
         tmp_file.write(content)
         tmp_path = tmp_file.name
-    
+
     try:
         # Extraction du texte du CV (opération sync dans un thread)
         reader = CVReader()
         logger.info(" Extraction du texte du CV...")
         cv_text = await run_in_thread(reader.extract_text, tmp_path)
-        
+
         if not cv_text or len(cv_text) < 50:
             raise CVExtractionError(
                 message="Le CV est vide ou illisible. Vérifiez que le PDF contient du texte.",
-                detail={"extracted_length": len(cv_text) if cv_text else 0}
+                detail={"extracted_length": len(cv_text) if cv_text else 0},
             )
-        
+
         logger.success(f" Texte extrait : {len(cv_text)} caractères")
-        
+
         # Construction des filtres
-        filters_dict = {}
+        filters_dict: dict[str, str | int] = {}
         if location:
             filters_dict["location"] = location
         if contract_type:
@@ -140,9 +147,9 @@ async def match_cv(
             filters_dict["experience"] = experience
         if days_limit:
             filters_dict["days_limit"] = days_limit
-        
+
         logger.info(f" Recherche de matches (top {top_n}) avec filtres: {filters_dict}")
-        
+
         # Recherche des offres correspondantes (opération sync dans un thread)
         matcher = JobMatcher()
         results = await run_in_thread(
@@ -152,17 +159,17 @@ async def match_cv(
             top_n=top_n,
             location=location,
             contract_type=contract_type,
-            experience=experience
+            experience=experience,
         )
-        
+
         if not results:
             raise NoMatchFoundError(
                 message="Aucune offre ne correspond à votre profil avec les filtres appliqués.",
-                detail={"filters": filters_dict, "cv_length": len(cv_text)}
+                detail={"filters": filters_dict, "cv_length": len(cv_text)},
             )
-        
+
         logger.success(f" {len(results)} offres trouvées")
-        
+
         # Conversion des résultats en schéma Pydantic
         matches = []
         for row in results:
@@ -175,38 +182,41 @@ async def match_cv(
                 required_experience=row.required_experience,
                 similarity_score=round(row.similarity_score, 4),
                 url=row.url,
-                creation_date=row.creation_date if hasattr(row, 'creation_date') else None,
-                source=row.source if hasattr(row, 'source') else None
+                creation_date=row.creation_date
+                if hasattr(row, "creation_date")
+                else None,
+                source=row.source if hasattr(row, "source") else None,
             )
             matches.append(match)
-        
+
         # Construction de la réponse
         execution_time = time.time() - start_time
-        
+
         filters_applied = None
         if any([location, contract_type, experience]):
             filters_applied = {
                 "location": location,
                 "contract_type": contract_type,
                 "experience": experience,
-                "days_limit": days_limit or 30
+                "days_limit": days_limit or 30,
             }
-        
+
         response = MatchResponse(
             matches=matches,
             total_matches=len(matches),
             cv_length=len(cv_text),
             execution_time=round(execution_time, 3),
-            filters_applied=filters_applied
+            filters_applied=filters_applied,
         )
-        
+
         logger.info(f" Matching terminé en {execution_time:.3f}s")
-        
+
         return response
-        
+
     finally:
         # Nettoyage du fichier temporaire
         import os
+
         try:
             os.unlink(tmp_path)
         except Exception:

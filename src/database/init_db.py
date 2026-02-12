@@ -5,14 +5,15 @@ from app.config import get_settings
 
 # NE PAS MODIFIER : C'est ici que SQLAlchemy découvre les tables
 from src.database.database import Base
-from src.database.models import JobOffer # noqa
+from src.database.models import JobOffer  # noqa
 
 settings = get_settings()
 DATABASE_URL = settings.DATABASE_URL
 
+
 def init_db():
     engine = create_engine(DATABASE_URL)
-    
+
     # Création de la base de données si nécessaire
     if not database_exists(engine.url):
         create_database(engine.url)
@@ -34,6 +35,7 @@ def init_db():
         logger.success("Tables créées avec succès.")
     except Exception as e:
         logger.error(f"Erreur lors de la création des tables : {e}")
+
 
 if __name__ == "__main__":
     init_db()

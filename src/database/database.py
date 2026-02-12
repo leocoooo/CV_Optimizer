@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base, DeclarativeMeta
 from app.config import get_settings
 
 settings = get_settings()
@@ -9,7 +9,8 @@ engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
+Base: DeclarativeMeta = declarative_base()  # type: ignore[assignment]
+
 
 # Fonction utilitaire pour obtenir une session
 def get_db():

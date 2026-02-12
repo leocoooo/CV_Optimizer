@@ -31,7 +31,7 @@ router = APIRouter()
     tags=["Admin"],
     summary="Lancer la collecte d'offres",
     description="Collecte de nouvelles offres via API France Travail et scraping. **Requiert une API key.**",
-    status_code=202
+    status_code=202,
 )
 async def collect_jobs(
     keywords: List[str],
@@ -77,68 +77,73 @@ async def collect_jobs(
     Returns:
         MessageResponse: Confirmation de lancement
     """
-    
+
     if not keywords:
         return MessageResponse(
             message="Liste de mots-clés vide, aucune collecte lancée.",
-            success=False
+            success=False,
+            data=None,
         )
-    
+
     # Fonction de collecte complète (exécutée en arrière-plan)
     async def run_collection():
         try:
             # API France Travail
             logger.info("Collecte API France Travail...")
             await run_in_thread(run_collector, keywords, max_offers)
-            
+
             # Scraping HelloWork : optionnel
             if enable_scraping:
-                logger.info(f"Démarrage scraping HelloWork ({max_offers} offres/mot-clé)...")
+                logger.info(
+                    f"Démarrage scraping HelloWork ({max_offers} offres/mot-clé)..."
+                )
                 await run_in_thread(
                     run_hw_scraper,
                     keywords_to_fetch=keywords,
                     max_offres_per_kw=max_offers,
                     save_to_db=True,
-                    headless=True
+                    headless=True,
                 )
                 logger.success(" Scraping HelloWork terminé")
-            
+
             # Scraping Welcome to the Jungle : optionnel
             if enable_scraping:
-                logger.info(f" Démarrage scraping Welcome to the Jungle ({max_offers} offres/mot-clé)...")
+                logger.info(
+                    f" Démarrage scraping Welcome to the Jungle ({max_offers} offres/mot-clé)..."
+                )
                 await run_in_thread(
                     run_wttj_scraper,
                     keywords_to_fetch=keywords,
                     max_offres_per_kw=max_offers,
                     save_to_db=True,
-                    headless=True
+                    headless=True,
                 )
                 logger.success(" Scraping Welcome to the Jungle terminé")
-            
+
             # Génération des embeddings pour les nouvelles offres
             logger.info(" Génération des embeddings...")
             await run_in_thread(process_embeddings)
-            
+
             logger.success(" Collecte complète terminée avec succès!")
-            
+
         except Exception as e:
             logger.error(f" Erreur lors de la collecte : {e}")
-    
+
     # Lancement en arrière-plan
     if background_tasks:
         background_tasks.add_task(run_collection)
     else:
         # Fallback si BackgroundTasks n'est pas disponible
         await run_collection()
-    
+
     return MessageResponse(
         message=f"Collecte lancée pour {len(keywords)} mot(s)-clé(s).",
         success=True,
         data={
             "keywords": keywords,
             "max_offers_per_keyword": max_offers,
-            "scraping_enabled": enable_scraping
-}
+            "scraping_enabled": enable_scraping,
+        },
     )
 
 
@@ -148,12 +153,12 @@ async def collect_jobs(
     tags=["Admin"],
     summary="Régénérer tous les embeddings",
     description="Régénère les embeddings pour toutes les offres. **Requiert une API key.**",
-    status_code=202
+    status_code=202,
 )
 async def reindex_embeddings(
     background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    api_key: str = Depends(verify_api_key),
 ):
     """
     Régénère les embeddings pour toutes les offres.
@@ -187,16 +192,17 @@ async def reindex_embeddings(
             logger.success("Réindexation terminée avec succès")
         except Exception as e:
             logger.error(f"Erreur lors de la réindexation : {e}")
-    
+
     # Lancement en arrière-plan
     if background_tasks:
         background_tasks.add_task(run_reindex)
     else:
         await run_reindex()
-    
+
     return MessageResponse(
         message="Réindexation des embeddings lancée en arrière-plan.",
-        success=True
+        success=True,
+        data=None,
     )
 
 
@@ -206,74 +212,80 @@ async def reindex_embeddings(
     tags=["Admin"],
     summary="Statistiques de la base",
     description="Statistiques sur les offres en base. **Requiert une API key.**",
-    status_code=200
+    status_code=200,
 )
 async def get_stats(
-    db: Session = Depends(get_db),
-    api_key: str = Depends(verify_api_key)
+    db: Session = Depends(get_db), api_key: str = Depends(verify_api_key)
 ):
     """
     Statistiques sur la base de données.
-    
+
     **Informations retournées** :
     - Nombre total d'offres
     - Nombre d'offres par source
     - Nombre d'offres avec/sans embeddings
     - Offre la plus récente
-    
+
     Args:
         db: Session DB (injecté)
         api_key: API key validée (injecté)
-    
+
     Returns:
         dict: Statistiques détaillées
     """
-    
+
     try:
         # Nombre total d'offres
         total_jobs = db.query(JobOffer).count()
-        
+
         # Nombre d'offres par source
-        by_source = db.query(
-            JobOffer.source,
-            func.count(JobOffer.id).label('count')
-        ).group_by(JobOffer.source).all()
-        
+        by_source = (
+            db.query(JobOffer.source, func.count(JobOffer.id).label("count"))
+            .group_by(JobOffer.source)
+            .all()
+        )
+
         sources_stats = {source: count for source, count in by_source}
-        
+
         # Offres avec/sans embeddings
-        with_embeddings = db.query(JobOffer).filter(JobOffer.embedding.isnot(None)).count()
+        with_embeddings = (
+            db.query(JobOffer).filter(JobOffer.embedding.isnot(None)).count()
+        )
         without_embeddings = total_jobs - with_embeddings
-        
+
         # Offre la plus récente
-        latest_job = db.query(JobOffer).order_by(
-            JobOffer.actualisation_date.desc()
-        ).first()
-        
+        latest_job = (
+            db.query(JobOffer).order_by(JobOffer.actualisation_date.desc()).first()
+        )
+
         latest_job_info = None
         if latest_job:
             latest_job_info = {
                 "title": latest_job.title,
                 "company": latest_job.company,
-                "date": latest_job.actualisation_date.isoformat() if latest_job.actualisation_date else None
+                "date": latest_job.actualisation_date.isoformat()
+                if latest_job.actualisation_date
+                else None,
             }
-        
+
         logger.info(f" Statistiques générées : {total_jobs} offres")
-        
+
         return {
             "total_jobs": total_jobs,
             "by_source": sources_stats,
             "embeddings": {
                 "with_embeddings": with_embeddings,
                 "without_embeddings": without_embeddings,
-                "percentage_indexed": round((with_embeddings / total_jobs * 100), 2) if total_jobs > 0 else 0
+                "percentage_indexed": round((with_embeddings / total_jobs * 100), 2)
+                if total_jobs > 0
+                else 0,
             },
-            "latest_job": latest_job_info
+            "latest_job": latest_job_info,
         }
-        
+
     except Exception as e:
         logger.error(f" Erreur lors de la génération des stats : {e}")
         raise DatabaseError(
             message="Impossible de générer les statistiques",
-            detail={"error": str(e)[:100]}
+            detail={"error": str(e)[:100]},
         )

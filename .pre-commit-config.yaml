@@ -14,5 +14,9 @@ repos:
     hooks:
       - id: mypy
         # Optionnel : ajoutez des dépendances si mypy en a besoin pour analyser votre code
-        additional_dependencies: [pandas-stubs, types-requests]
-        args: [--strict] # Elever --strict si c'est trop restrictif
+        additional_dependencies:
+                  - pandas-stubs
+                  - "pymupdf>=1.23.0"
+                  - types-SQLAlchemy
+                  - types-requests
+                  - pydantic

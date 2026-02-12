@@ -6,7 +6,12 @@ from src.services.embedder import Embedder
 
 # Configuration du logger
 logger.remove()
-logger.add(sys.stderr, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>", level="INFO")
+logger.add(
+    sys.stderr,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
+    level="INFO",
+)
+
 
 def process_embeddings():
     """
@@ -14,12 +19,14 @@ def process_embeddings():
     """
     db = SessionLocal()
     embedder = Embedder()
-    
+
     try:
         # 1. Sélection des offres sans embedding
-        offers_to_process = db.query(JobOffer).filter(JobOffer.embedding.is_(None)).all()
+        offers_to_process = (
+            db.query(JobOffer).filter(JobOffer.embedding.is_(None)).all()
+        )
         total = len(offers_to_process)
-        
+
         if total == 0:
             logger.info("Toutes les offres sont déjà vectorisées.")
             return
@@ -31,11 +38,11 @@ def process_embeddings():
                 # 2. Génération de l'embedding
                 vector = embedder.get_embedding(offer.description)
                 offer.embedding = vector
-                
+
                 # Log de progression tous les 50 éléments
                 if (index + 1) % 50 == 0:
                     logger.info(f"Progression : {index + 1}/{total}")
-        
+
         # 3. Sauvegarde groupée
         db.commit()
         logger.success(f"Vectorisation terminée avec succès pour {total} offres.")
@@ -46,6 +53,7 @@ def process_embeddings():
     finally:
         db.close()
         logger.info("Session de base de données fermée.")
+
 
 if __name__ == "__main__":
     process_embeddings()

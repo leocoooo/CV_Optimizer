@@ -8,13 +8,13 @@ from typing import Optional
 
 class AdviceRequest(BaseModel):
     """Requête pour obtenir des conseils d'optimisation CV."""
-    
+
     job_id: str = Field(..., description="Identifiant de l'offre d'emploi ciblée")
 
 
 class AdviceResponse(BaseModel):
     """Réponse avec les conseils du LLM."""
-    
+
     job_id: str = Field(..., description="ID de l'offre analysée")
     job_title: str = Field(..., description="Titre du poste")
     company: str = Field(..., description="Nom de l'entreprise")

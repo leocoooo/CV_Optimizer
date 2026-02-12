@@ -1,6 +1,7 @@
 from sentence_transformers import SentenceTransformer
 from loguru import logger
 
+
 class Embedder:
     def __init__(self, model_name: str = "paraphrase-multilingual-MiniLM-L12-v2"):
         logger.info(f"Chargement du modèle NLP : {model_name}")
