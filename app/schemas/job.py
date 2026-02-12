@@ -41,9 +41,6 @@ class JobResponse(BaseModel):
         None, description="Date de mise à jour"
     )
 
-    class Config:
-        from_attributes = True  # Pour compatibility avec SQLAlchemy
-
 
 class JobListResponse(BaseModel):
     """Réponse paginée avec liste d'offres."""
