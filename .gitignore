@@ -6,7 +6,7 @@ src/database/pycache/
 src/services/pycache/
 *.pyc
 data/scrapping/
-explanation_API/
+doc/
 data/.DS_Store
 .mypy_cache/
 .ruff_cache/
