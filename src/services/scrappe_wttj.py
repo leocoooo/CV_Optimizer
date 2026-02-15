@@ -228,6 +228,9 @@ def run_wttj_scraper(
 
     try:
         # Lancement du scraping
+        logger.debug(
+            f"Keywords reçus par run_wttj_scraper : {keywords_to_fetch} (type: {type(keywords_to_fetch)})"
+        )
         scraped_offers = scrape_wttj_json_strategy(
             keywords=keywords_to_fetch,
             max_offres_per_kw=max_offres_per_kw,
@@ -261,7 +264,7 @@ def run_wttj_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["data scientist back market"]
+    keywords_to_test = ["Data Scientist", "Data Engineer"]
     offers = run_wttj_scraper(
         keywords_to_test, max_offres_per_kw=3, save_to_db=True, headless=False
     )
