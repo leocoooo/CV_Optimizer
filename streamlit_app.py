@@ -503,11 +503,16 @@ elif page == "🔧 Admin":
 
     # Options avancées
     with st.expander("⚙️ Options avancées"):
-        st.markdown("""
+        hw_icon = "✅" if enable_scraping else "❌"
+        hw_status = "Activé" if enable_scraping else "Désactivé"
+        wttj_icon = "✅" if enable_scraping else "❌"
+        wttj_status = "Activé" if enable_scraping else "Désactivé"
+
+        st.markdown(f"""
         **Sources de collecte :**
         - ✅ **API France Travail** : Toujours activée (officielle, rapide, fiable)
-        - {'✅' if enable_scraping else '❌'} **HelloWork** : {'Activé' if enable_scraping else 'Désactivé'} (scraping web)
-        - {'✅' if enable_scraping else '❌'} **Welcome to the Jungle** : {'Activé' if enable_scraping else 'Désactivé'} (scraping web)
+        - {hw_icon} **HelloWork** : {hw_status} (scraping web)
+        - {wttj_icon} **Welcome to the Jungle** : {wttj_status} (scraping web)
         
         **Processus de collecte :**
         1. Collecte des offres depuis les sources sélectionnées

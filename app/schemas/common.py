@@ -57,7 +57,9 @@ class MessageResponse(BaseModel):
 class CollectRequest(BaseModel):
     """Requête de collecte d'offres."""
 
-    keywords: list[str] = Field(..., description="Liste de mots-clés pour la recherche")
+    keywords: list[str] = Field(
+        ..., min_length=1, description="Liste de mots-clés pour la recherche"
+    )
     max_offers: int = Field(
         10, ge=1, le=100, description="Nombre max d'offres par mot-clé"
     )
