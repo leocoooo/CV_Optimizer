@@ -1,0 +1,3 @@
+"""
+Utilitaires pour l'interface.
+"""
