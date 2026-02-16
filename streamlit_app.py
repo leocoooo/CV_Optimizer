@@ -18,7 +18,9 @@ API_URL = st.sidebar.text_input("URL de l'API", value="http://localhost:8000")
 
 # Titre principal
 st.title("📄 CV-Optimizer")
-st.markdown("**Trouvez les meilleures offres d'emploi correspondant à votre CV**")
+st.markdown(
+    "**Trouvez les meilleures offres d'emploi correspondant à votre profil et fine tunez votre CV **"
+)
 
 # Sidebar - Navigation
 st.sidebar.title("Navigation")

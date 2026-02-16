@@ -5,12 +5,16 @@ Page de recherche d'offres d'emploi.
 import streamlit as st
 from ui.utils.api_client import APIClient
 from ui.utils.config import DEFAULT_PAGE_SIZE, DEFAULT_DAYS_LIMIT
+from ui.components.cards import gradient_header, metric_card, status_message
 
 
 def render(api_client: APIClient, api_status: bool):
     """Affiche la page de recherche d'offres."""
-    st.header("💼 Recherche d'offres d'emploi")
-    st.markdown("Parcourez et filtrez les offres disponibles dans la base de données")
+    gradient_header(
+        "💼 Recherche d'offres d'emploi",
+        "Parcourez et filtrez les offres disponibles dans la base de données",
+        gradient="blue",
+    )
 
     col1, col2, col3 = st.columns(3)
 
@@ -63,11 +67,16 @@ def render(api_client: APIClient, api_status: bool):
                     days_limit=days_limit,
                 )
 
-                st.success(f"✅ {data['total']} offres trouvées")
+                status_message(f"✅ {data['total']} offres trouvées", "success")
+
+                # Métriques
                 col1, col2, col3 = st.columns(3)
-                col1.metric("Total", data["total"])
-                col2.metric("Page", f"{data['page']}/{data['total_pages']}")
-                col3.metric("Résultats", len(data["jobs"]))
+                with col1:
+                    metric_card("Total", str(data["total"]), "purple")
+                with col2:
+                    metric_card("Page", f"{data['page']}/{data['total_pages']}", "pink")
+                with col3:
+                    metric_card("Résultats", str(len(data["jobs"])), "blue")
 
                 st.markdown("---")
 

@@ -8,29 +8,116 @@ from typing import Dict, Any
 
 def display_stats(stats: Dict[str, Any]):
     """
-    Affiche les statistiques de la base de données.
+    Affiche les statistiques de la base de données avec des cards colorées.
 
     Args:
         stats: Dictionnaire contenant les statistiques
     """
+    # Statistiques principales avec cards colorées
     col1, col2, col3, col4 = st.columns(4)
 
-    # Statistiques principales
-    col1.metric("Total offres", stats.get("total_jobs", 0))
-
     embeddings_data = stats.get("embeddings", {})
-    col2.metric("Avec embeddings", embeddings_data.get("with_embeddings", 0))
-    col3.metric("Sans embeddings", embeddings_data.get("without_embeddings", 0))
-    col4.metric(
-        "Taux d'indexation",
-        f"{embeddings_data.get('percentage_indexed', 0):.1f}%",
-    )
+
+    with col1:
+        st.markdown(
+            f"""
+            <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 1.5rem; border-radius: 12px; text-align: center;'>
+                <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
+                    Total offres
+                </div>
+                <div style='color: white; font-size: 2rem; font-weight: 600;'>
+                    {stats.get("total_jobs", 0)}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col2:
+        st.markdown(
+            f"""
+            <div style='background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                        padding: 1.5rem; border-radius: 12px; text-align: center;'>
+                <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
+                    Avec embeddings
+                </div>
+                <div style='color: white; font-size: 2rem; font-weight: 600;'>
+                    {embeddings_data.get("with_embeddings", 0)}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col3:
+        st.markdown(
+            f"""
+            <div style='background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                        padding: 1.5rem; border-radius: 12px; text-align: center;'>
+                <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
+                    Sans embeddings
+                </div>
+                <div style='color: white; font-size: 2rem; font-weight: 600;'>
+                    {embeddings_data.get("without_embeddings", 0)}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col4:
+        percentage = embeddings_data.get("percentage_indexed", 0)
+        st.markdown(
+            f"""
+            <div style='background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); 
+                        padding: 1.5rem; border-radius: 12px; text-align: center;'>
+                <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
+                    Taux d'indexation
+                </div>
+                <div style='color: white; font-size: 2rem; font-weight: 600;'>
+                    {percentage:.1f}%
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     # Répartition par source
-    if "by_source" in stats:
+    if "by_source" in stats and stats["by_source"]:
         st.markdown("---")
-        st.markdown("**📊 Répartition par source :**")
+        st.markdown(
+            """
+            <div style='background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); 
+                        padding: 1rem; border-radius: 12px; margin: 1rem 0;'>
+                <h4 style='color: white; margin: 0; border: none;'>📊 Répartition par source</h4>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         source_cols = st.columns(len(stats["by_source"]))
+        gradients = [
+            "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+            "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+            "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+        ]
+
         for idx, (source, count) in enumerate(stats["by_source"].items()):
-            source_cols[idx].metric(source, count)
+            gradient = gradients[idx % len(gradients)]
+            with source_cols[idx]:
+                st.markdown(
+                    f"""
+                    <div style='background: {gradient}; 
+                                padding: 1rem; border-radius: 12px; text-align: center;'>
+                        <div style='color: rgba(255,255,255,0.9); font-size: 0.85rem; margin-bottom: 0.5rem;'>
+                            {source}
+                        </div>
+                        <div style='color: white; font-size: 1.5rem; font-weight: 600;'>
+                            {count}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )

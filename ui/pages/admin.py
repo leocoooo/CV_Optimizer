@@ -5,6 +5,7 @@ Page d'administration - Collecte de données.
 import streamlit as st
 from ui.utils.api_client import APIClient
 from ui.components.stats_display import display_stats
+from ui.components.cards import info_card, status_message
 
 
 def render(api_client: APIClient, api_status: bool):
@@ -13,11 +14,16 @@ def render(api_client: APIClient, api_status: bool):
     st.markdown("Lancez la collecte d'offres depuis différentes sources")
 
     # API Key
-    st.subheader("🔑 Authentification")
+    info_card(
+        "🔑 Authentification",
+        "Entrez votre clé API admin pour accéder aux fonctionnalités de collecte",
+        gradient="purple",
+    )
     api_key = st.text_input(
         "API Key Admin",
         type="password",
         help="Clé API définie dans votre fichier .env (API_KEY_ADMIN)",
+        label_visibility="collapsed",
     )
 
     st.markdown("---")
@@ -38,11 +44,11 @@ def render(api_client: APIClient, api_status: bool):
 
     with col2:
         max_offers = st.number_input(
-            "Nombre max d'offres par mot-clé",
+            "Nombre max d'offres par mot-clé et par source",
             min_value=1,
             max_value=100,
             value=10,
-            help="Limite le nombre d'offres collectées par mot-clé",
+            help="Limite le nombre d'offres collectées",
         )
 
         enable_scraping = st.checkbox(
@@ -51,12 +57,24 @@ def render(api_client: APIClient, api_status: bool):
             help="Active HelloWork et Welcome to the Jungle (plus lent)",
         )
 
-    # Aperçu
+    # Aperçu avec card stylisée
     sources_count = 1 + (2 if enable_scraping else 0)
     total_max = len(keywords) * sources_count * max_offers
 
-    st.info(
-        f"📊 Configuration : {len(keywords)} mot(s)-clé × {sources_count} source(s) × {max_offers} offres = ~{total_max} offres max (hors doublons)"
+    st.markdown(
+        f"""
+        <div style='background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                    padding: 1.5rem; border-radius: 12px; margin: 1rem 0;'>
+            <h4 style='color: white; margin: 0 0 0.5rem 0; border: none;'>📊 Aperçu de la collecte</h4>
+            <p style='color: white; margin: 0; font-size: 1.1rem;'>
+                <strong>{len(keywords)}</strong> mot(s)-clé × 
+                <strong>{sources_count}</strong> source(s) × 
+                <strong>{max_offers}</strong> offres = 
+                <strong>~{total_max}</strong> offres max (hors doublons)
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     st.markdown("---")
@@ -68,7 +86,7 @@ def render(api_client: APIClient, api_status: bool):
 
     with col1:
         if st.button(
-            "🚀 Collecte Complète (API + Scraping)",
+            "🚀 Collecter",
             type="primary",
             disabled=not api_key or not keywords or not api_status,
             help="Collecte depuis toutes les sources : API France Travail + HelloWork + Welcome to the Jungle",
@@ -85,16 +103,16 @@ def render(api_client: APIClient, api_status: bool):
                         enable_scraping=enable_scraping,
                     )
 
-                    st.success(f"✅ {data['message']}")
+                    status_message(f"✅ {data['message']}", "success")
                     st.info(
                         "💡 La collecte s'exécute en arrière-plan. Consultez les logs de l'API pour suivre la progression."
                     )
 
                 except Exception as e:
                     if "403" in str(e):
-                        st.error("❌ API Key invalide")
+                        status_message("❌ API Key invalide", "error")
                     else:
-                        st.error(f"❌ Erreur: {str(e)}")
+                        status_message(f"❌ Erreur: {str(e)}", "error")
 
     with col2:
         if st.button(
@@ -108,14 +126,14 @@ def render(api_client: APIClient, api_status: bool):
                 try:
                     data = api_client.reindex_embeddings(api_key=api_key)
 
-                    st.success(f"✅ {data['message']}")
+                    status_message(f"✅ {data['message']}", "success")
                     st.info("💡 La réindexation s'exécute en arrière-plan.")
 
                 except Exception as e:
                     if "403" in str(e):
-                        st.error("❌ API Key invalide")
+                        status_message("❌ API Key invalide", "error")
                     else:
-                        st.error(f"❌ Erreur: {str(e)}")
+                        status_message(f"❌ Erreur: {str(e)}", "error")
 
     st.markdown("---")
 
@@ -155,9 +173,9 @@ def render(api_client: APIClient, api_status: bool):
 
         except Exception as e:
             if "403" in str(e):
-                st.error("❌ API Key invalide")
+                status_message("❌ API Key invalide", "error")
             else:
-                st.error(f"❌ Erreur: {str(e)}")
+                status_message(f"❌ Erreur: {str(e)}", "error")
 
     st.markdown("---")
     st.warning(
