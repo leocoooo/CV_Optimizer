@@ -16,6 +16,17 @@ def render(api_client: APIClient, api_status: bool):
         gradient="blue",
     )
 
+    # Message d'aide pour l'utilisateur
+    st.info(
+        """
+        💡 **Comment utiliser la recherche :**
+        - Laissez tous les champs vides pour voir toutes les offres récentes
+        - Ajoutez des filtres pour affiner votre recherche
+        - Utilisez les mots-clés pour rechercher dans les titres et descriptions
+        - Le filtre "Offres des N derniers jours" s'applique à la date de collecte en base
+        """
+    )
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -67,46 +78,65 @@ def render(api_client: APIClient, api_status: bool):
                     days_limit=days_limit,
                 )
 
-                status_message(f"✅ {data['total']} offres trouvées", "success")
+                # Gestion du cas "0 résultats"
+                if data["total"] == 0:
+                    st.warning(
+                        "🔍 Aucune offre ne correspond à vos critères de recherche."
+                    )
 
-                # Métriques
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    metric_card("Total", str(data["total"]), "purple")
-                with col2:
-                    metric_card("Page", f"{data['page']}/{data['total_pages']}", "pink")
-                with col3:
-                    metric_card("Résultats", str(len(data["jobs"])), "blue")
+                    # Suggestions pour améliorer la recherche
+                    st.info(
+                        """
+                        💡 **Suggestions pour améliorer votre recherche :**
+                        - Essayez d'élargir la période de recherche (augmentez le nombre de jours)
+                        - Retirez certains filtres pour obtenir plus de résultats
+                        - Vérifiez l'orthographe de vos mots-clés
+                        - Essayez des termes plus généraux (ex: "Data" au lieu de "Data Scientist")
+                        """
+                    )
+                else:
+                    status_message(f"✅ {data['total']} offres trouvées", "success")
 
-                st.markdown("---")
+                    # Métriques
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        metric_card("Total", str(data["total"]), "purple")
+                    with col2:
+                        metric_card(
+                            "Page", f"{data['page']}/{data['total_pages']}", "pink"
+                        )
+                    with col3:
+                        metric_card("Résultats", str(len(data["jobs"])), "blue")
 
-                for i, job in enumerate(data["jobs"], 1):
-                    with st.expander(
-                        f"#{(page_num - 1) * page_size + i} - {job['title']} - {job['company']}"
-                    ):
-                        col1, col2 = st.columns([3, 1])
+                    st.markdown("---")
 
-                        with col1:
-                            st.markdown(f"**Entreprise:** {job['company']}")
-                            if job.get("location"):
-                                st.markdown(f"**Localisation:** {job['location']}")
-                            if job.get("contract_type"):
-                                st.markdown(f"**Contrat:** {job['contract_type']}")
-                            if job.get("required_experience"):
-                                st.markdown(
-                                    f"**Expérience:** {job['required_experience']}"
-                                )
-                            if job.get("description"):
-                                st.markdown(
-                                    f"**Description:** {job['description'][:200]}..."
-                                )
-                            if job.get("source"):
-                                st.markdown(f"**Source:** {job['source']}")
+                    for i, job in enumerate(data["jobs"], 1):
+                        with st.expander(
+                            f"#{(page_num - 1) * page_size + i} - {job['title']} - {job['company']}"
+                        ):
+                            col1, col2 = st.columns([3, 1])
 
-                        with col2:
-                            st.markdown(f"**ID:** `{job['id'][:8]}...`")
-                            if job.get("url"):
-                                st.link_button("Voir l'offre", job["url"])
+                            with col1:
+                                st.markdown(f"**Entreprise:** {job['company']}")
+                                if job.get("location"):
+                                    st.markdown(f"**Localisation:** {job['location']}")
+                                if job.get("contract_type"):
+                                    st.markdown(f"**Contrat:** {job['contract_type']}")
+                                if job.get("required_experience"):
+                                    st.markdown(
+                                        f"**Expérience:** {job['required_experience']}"
+                                    )
+                                if job.get("description"):
+                                    st.markdown(
+                                        f"**Description:** {job['description'][:200]}..."
+                                    )
+                                if job.get("source"):
+                                    st.markdown(f"**Source:** {job['source']}")
+
+                            with col2:
+                                st.markdown(f"**ID:** `{job['id'][:8]}...`")
+                                if job.get("url"):
+                                    st.link_button("Voir l'offre", job["url"])
 
             except Exception as e:
                 st.error(f"❌ Erreur lors de la requête: {str(e)}")
