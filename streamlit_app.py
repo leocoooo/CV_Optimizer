@@ -45,7 +45,7 @@ st.markdown(
             📄 CV-Optimizer
         </h1>
         <p style='color: #666; font-size: 1.2rem; margin-top: 0.5rem;'>
-            Trouvez les meilleures offres d'emploi correspondant à votre profil et fine tunez votre CV
+            Trouvez les meilleures offres d'emploi correspondant à votre profil et peaufiner votre CV
         </p>
     </div>
     """,

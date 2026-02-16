@@ -3,6 +3,7 @@ Page d'administration - Collecte de données.
 """
 
 import streamlit as st
+import requests
 from ui.utils.api_client import APIClient
 from ui.components.stats_display import display_stats
 from ui.components.cards import info_card, status_message
@@ -108,11 +109,18 @@ def render(api_client: APIClient, api_status: bool):
                         "💡 La collecte s'exécute en arrière-plan. Consultez les logs de l'API pour suivre la progression."
                     )
 
-                except Exception as e:
-                    if "403" in str(e):
+                except requests.HTTPError as e:
+                    if e.response.status_code == 403:
                         status_message("❌ API Key invalide", "error")
                     else:
-                        status_message(f"❌ Erreur: {str(e)}", "error")
+                        status_message(
+                            f"❌ Erreur HTTP {e.response.status_code}: {str(e)}",
+                            "error",
+                        )
+                except requests.RequestException as e:
+                    status_message(f"❌ Erreur de connexion: {str(e)}", "error")
+                except Exception as e:
+                    status_message(f"❌ Erreur inattendue: {str(e)}", "error")
 
     with col2:
         if st.button(
@@ -129,11 +137,18 @@ def render(api_client: APIClient, api_status: bool):
                     status_message(f"✅ {data['message']}", "success")
                     st.info("💡 La réindexation s'exécute en arrière-plan.")
 
-                except Exception as e:
-                    if "403" in str(e):
+                except requests.HTTPError as e:
+                    if e.response.status_code == 403:
                         status_message("❌ API Key invalide", "error")
                     else:
-                        status_message(f"❌ Erreur: {str(e)}", "error")
+                        status_message(
+                            f"❌ Erreur HTTP {e.response.status_code}: {str(e)}",
+                            "error",
+                        )
+                except requests.RequestException as e:
+                    status_message(f"❌ Erreur de connexion: {str(e)}", "error")
+                except Exception as e:
+                    status_message(f"❌ Erreur inattendue: {str(e)}", "error")
 
     st.markdown("---")
 
@@ -171,11 +186,17 @@ def render(api_client: APIClient, api_status: bool):
             stats = api_client.get_stats(api_key=api_key)
             display_stats(stats)
 
-        except Exception as e:
-            if "403" in str(e):
+        except requests.HTTPError as e:
+            if e.response.status_code == 403:
                 status_message("❌ API Key invalide", "error")
             else:
-                status_message(f"❌ Erreur: {str(e)}", "error")
+                status_message(
+                    f"❌ Erreur HTTP {e.response.status_code}: {str(e)}", "error"
+                )
+        except requests.RequestException as e:
+            status_message(f"❌ Erreur de connexion: {str(e)}", "error")
+        except Exception as e:
+            status_message(f"❌ Erreur inattendue: {str(e)}", "error")
 
     st.markdown("---")
     st.warning(

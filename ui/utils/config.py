@@ -2,12 +2,22 @@
 Configuration de l'interface utilisateur.
 """
 
-# Couleurs
+# Couleurs (utilisées dans les gradients)
 PRIMARY_COLOR = "#1f77b4"
 SUCCESS_COLOR = "#28a745"
 ERROR_COLOR = "#dc3545"
 WARNING_COLOR = "#ffc107"
 INFO_COLOR = "#17a2b8"
+
+# Gradients pour les composants
+GRADIENTS = {
+    "purple": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    "pink": "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+    "blue": "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+    "yellow": "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+    "pastel": "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
+    "dark": "linear-gradient(135deg, #30cfd0 0%, #330867 100%)",
+}
 
 # Limites
 MAX_FILE_SIZE_MB = 5

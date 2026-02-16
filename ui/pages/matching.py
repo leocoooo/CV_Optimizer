@@ -3,6 +3,7 @@ Page de matching CV avec offres d'emploi.
 """
 
 import streamlit as st
+import html
 from ui.utils.api_client import APIClient
 from ui.utils.config import DEFAULT_TOP_N, DEFAULT_DAYS_LIMIT, MAX_TOP_N
 from ui.components.cards import gradient_header, metric_card, status_message, info_card
@@ -105,13 +106,17 @@ def render(api_client: APIClient, api_status: bool):
                             f"{score_emoji} #{i} - {match['title']} - {match['company']} ({match['similarity_score']:.1%})",
                             expanded=(i <= 3),
                         ):
+                            # Sanitize user-provided content to prevent XSS
+                            safe_title = html.escape(match["title"])
+                            safe_company = html.escape(match["company"])
+
                             st.markdown(
                                 f"""
                                 <div style='background: linear-gradient(90deg, #f8f9fa 0%, #ffffff 100%); 
                                             padding: 1rem; border-radius: 8px; margin-bottom: 1rem;'>
-                                    <h3 style='margin: 0; color: #333; border: none;'>{match["title"]}</h3>
+                                    <h3 style='margin: 0; color: #333; border: none;'>{safe_title}</h3>
                                     <p style='margin: 0.5rem 0 0 0; color: #666;'>
-                                        <strong>{match["company"]}</strong>
+                                        <strong>{safe_company}</strong>
                                     </p>
                                 </div>
                                 """,

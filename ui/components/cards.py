@@ -3,6 +3,8 @@ Composants de cards réutilisables pour l'interface.
 """
 
 import streamlit as st
+import html
+from ui.utils.config import GRADIENTS
 
 
 def gradient_header(title: str, subtitle: str, gradient: str = "purple"):
@@ -12,27 +14,22 @@ def gradient_header(title: str, subtitle: str, gradient: str = "purple"):
     Args:
         title: Titre principal
         subtitle: Sous-titre
-        gradient: Type de gradient (purple, pink, blue, yellow, pastel)
+        gradient: Type de gradient (purple, pink, blue, yellow, pastel, dark)
     """
-    gradients = {
-        "purple": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        "pink": "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-        "blue": "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-        "yellow": "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-        "pastel": "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
-        "dark": "linear-gradient(135deg, #30cfd0 0%, #330867 100%)",
-    }
-
-    gradient_css = gradients.get(gradient, gradients["purple"])
+    gradient_css = GRADIENTS.get(gradient, GRADIENTS["purple"])
     text_color = "white" if gradient != "pastel" else "#333"
+
+    # Sanitize user inputs to prevent XSS
+    safe_title = html.escape(title)
+    safe_subtitle = html.escape(subtitle)
 
     st.markdown(
         f"""
         <div style='background: {gradient_css}; 
                     padding: 2rem; border-radius: 12px; margin-bottom: 2rem;'>
-            <h1 style='color: {text_color}; margin: 0; border: none;'>{title}</h1>
+            <h1 style='color: {text_color}; margin: 0; border: none;'>{safe_title}</h1>
             <p style='color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 1.1rem;'>
-                {subtitle}
+                {safe_subtitle}
             </p>
         </div>
         """,
@@ -47,25 +44,23 @@ def metric_card(label: str, value: str, gradient: str = "purple"):
     Args:
         label: Label de la métrique
         value: Valeur à afficher
-        gradient: Type de gradient
+        gradient: Type de gradient (purple, pink, blue, yellow, pastel, dark)
     """
-    gradients = {
-        "purple": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        "pink": "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-        "blue": "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-    }
+    gradient_css = GRADIENTS.get(gradient, GRADIENTS["purple"])
 
-    gradient_css = gradients.get(gradient, gradients["purple"])
+    # Sanitize user inputs to prevent XSS
+    safe_label = html.escape(label)
+    safe_value = html.escape(value)
 
     st.markdown(
         f"""
         <div style='background: {gradient_css}; 
                     padding: 1.5rem; border-radius: 12px; text-align: center;'>
             <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
-                {label}
+                {safe_label}
             </div>
             <div style='color: white; font-size: 2rem; font-weight: 600;'>
-                {value}
+                {safe_value}
             </div>
         </div>
         """,
@@ -79,24 +74,19 @@ def info_card(title: str, content: str, gradient: str = "purple"):
 
     Args:
         title: Titre de la card
-        content: Contenu de la card
-        gradient: Type de gradient
+        content: Contenu de la card (peut être vide)
+        gradient: Type de gradient (purple, pink, blue, yellow, pastel, dark)
     """
-    gradients = {
-        "purple": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        "pink": "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-        "blue": "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-        "yellow": "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-        "dark": "linear-gradient(135deg, #30cfd0 0%, #330867 100%)",
-    }
+    gradient_css = GRADIENTS.get(gradient, GRADIENTS["purple"])
 
-    gradient_css = gradients.get(gradient, gradients["purple"])
+    # Sanitize user input to prevent XSS
+    safe_title = html.escape(title)
 
     st.markdown(
         f"""
         <div style='background: {gradient_css}; 
                     padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;'>
-            <h3 style='color: white; margin: 0; border: none;'>{title}</h3>
+            <h3 style='color: white; margin: 0; border: none;'>{safe_title}</h3>
         </div>
         """,
         unsafe_allow_html=True,
@@ -111,10 +101,13 @@ def status_message(message: str, status: str = "success"):
         message: Message à afficher
         status: Type de statut (success, error, warning)
     """
+    # Sanitize user input to prevent XSS
+    safe_message = html.escape(message)
+
     st.markdown(
         f"""
         <div class='status-badge status-{status}' style='padding: 1rem; font-size: 1rem; margin: 1rem 0;'>
-            {message}
+            {safe_message}
         </div>
         """,
         unsafe_allow_html=True,
