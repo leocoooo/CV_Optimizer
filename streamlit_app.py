@@ -24,7 +24,13 @@ st.markdown("**Trouvez les meilleures offres d'emploi correspondant à votre CV*
 st.sidebar.title("Navigation")
 page = st.sidebar.radio(
     "Choisir une page",
-    ["🎯 Matching CV", "💼 Recherche d'offres", "💡 Conseils LLM", "ℹ️ À propos"],
+    [
+        "🎯 Matching CV",
+        "💼 Recherche d'offres",
+        "💡 Conseils LLM",
+        "🔧 Admin",
+        "ℹ️ À propos",
+    ],
 )
 
 
@@ -363,7 +369,214 @@ elif page == "💡 Conseils LLM":
                     st.error(f"❌ Erreur lors de la requête: {str(e)}")
 
 # ============================================================================
-# PAGE 4: À PROPOS
+# PAGE 4: ADMIN
+# ============================================================================
+elif page == "🔧 Admin":
+    st.header("🔧 Administration - Collecte de données")
+    st.markdown("Lancez la collecte d'offres depuis différentes sources")
+
+    # API Key
+    st.subheader("🔑 Authentification")
+    api_key = st.text_input(
+        "API Key Admin",
+        type="password",
+        help="Clé API définie dans votre fichier .env (API_KEY_ADMIN)",
+    )
+
+    st.markdown("---")
+
+    # Configuration de la collecte
+    st.subheader("⚙️ Configuration de la collecte")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        keywords_input = st.text_area(
+            "Mots-clés (séparés par des virgules)",
+            value="Data Scientist, Data Engineer, ML Engineer",
+            height=150,
+            help="Entrez les mots-clés séparés par des virgules",
+        )
+        keywords = [k.strip() for k in keywords_input.split(",") if k.strip()]
+
+    with col2:
+        max_offers = st.number_input(
+            "Nombre max d'offres par mot-clé",
+            min_value=1,
+            max_value=100,
+            value=10,
+            help="Limite le nombre d'offres collectées par mot-clé",
+        )
+
+        enable_scraping = st.checkbox(
+            "Activer le web scraping",
+            value=True,
+            help="Active HelloWork et Welcome to the Jungle (plus lent)",
+        )
+
+    # Aperçu
+    sources_count = 1 + (2 if enable_scraping else 0)  # API + (HW + WTTJ si scraping)
+    total_max = len(keywords) * sources_count * max_offers
+
+    st.info(
+        f"📊 Configuration : {len(keywords)} mot(s)-clé × {sources_count} source(s) × {max_offers} offres = ~{total_max} offres max (hors doublons)"
+    )
+
+    st.markdown("---")
+
+    # Boutons de collecte
+    st.subheader("🚀 Lancer la collecte")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button(
+            "🚀 Collecte Complète (API + Scraping)",
+            type="primary",
+            disabled=not api_key or not keywords or not api_status,
+            help="Collecte depuis toutes les sources : API France Travail + HelloWork + Welcome to the Jungle",
+            use_container_width=True,
+        ):
+            with st.spinner(
+                "Collecte complète en cours... (peut prendre plusieurs minutes)"
+            ):
+                try:
+                    headers = {"X-API-Key": api_key}
+                    payload = {
+                        "keywords": keywords,
+                        "max_offers": max_offers,
+                        "enable_scraping": enable_scraping,
+                    }
+
+                    response = requests.post(
+                        f"{API_URL}/api/admin/collect",
+                        json=payload,
+                        headers=headers,
+                        timeout=300,
+                    )
+
+                    if response.status_code == 202:
+                        data = response.json()
+                        st.success(f"✅ {data['message']}")
+                        st.info(
+                            "💡 La collecte s'exécute en arrière-plan. Consultez les logs de l'API pour suivre la progression."
+                        )
+                    elif response.status_code == 403:
+                        st.error("❌ API Key invalide")
+                    else:
+                        st.error(f"❌ Erreur: {response.status_code} - {response.text}")
+
+                except Exception as e:
+                    st.error(f"❌ Erreur: {str(e)}")
+
+    with col2:
+        if st.button(
+            "🔄 Réindexer les embeddings",
+            type="secondary",
+            disabled=not api_key or not api_status,
+            help="Régénère les embeddings pour toutes les offres sans embedding",
+            use_container_width=True,
+        ):
+            with st.spinner("Réindexation en cours..."):
+                try:
+                    headers = {"X-API-Key": api_key}
+
+                    response = requests.post(
+                        f"{API_URL}/api/admin/reindex",
+                        headers=headers,
+                        timeout=300,
+                    )
+
+                    if response.status_code == 202:
+                        data = response.json()
+                        st.success(f"✅ {data['message']}")
+                        st.info("💡 La réindexation s'exécute en arrière-plan.")
+                    elif response.status_code == 403:
+                        st.error("❌ API Key invalide")
+                    else:
+                        st.error(f"❌ Erreur: {response.status_code} - {response.text}")
+
+                except Exception as e:
+                    st.error(f"❌ Erreur: {str(e)}")
+
+    st.markdown("---")
+
+    # Options avancées
+    with st.expander("⚙️ Options avancées"):
+        hw_icon = "✅" if enable_scraping else "❌"
+        hw_status = "Activé" if enable_scraping else "Désactivé"
+        wttj_icon = "✅" if enable_scraping else "❌"
+        wttj_status = "Activé" if enable_scraping else "Désactivé"
+
+        st.markdown(f"""
+        **Sources de collecte :**
+        - ✅ **API France Travail** : Toujours activée (officielle, rapide, fiable)
+        - {hw_icon} **HelloWork** : {hw_status} (scraping web)
+        - {wttj_icon} **Welcome to the Jungle** : {wttj_status} (scraping web)
+        
+        **Processus de collecte :**
+        1. Collecte des offres depuis les sources sélectionnées
+        2. Vérification des doublons (par URL)
+        3. Insertion en base de données
+        4. Génération automatique des embeddings
+        
+        **Temps estimé :**
+        - API seule : ~30s pour 30 offres
+        - API + Scraping : ~2-5 min pour 30 offres (selon les sites)
+        """)
+
+    st.markdown("---")
+
+    # Statistiques de la base
+    st.subheader("📊 Statistiques de la base de données")
+
+    if st.button("🔍 Afficher les stats", disabled=not api_key or not api_status):
+        try:
+            headers = {"X-API-Key": api_key}
+            response = requests.get(
+                f"{API_URL}/api/admin/stats", headers=headers, timeout=10
+            )
+
+            if response.status_code == 200:
+                stats = response.json()
+
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Total offres", stats.get("total_jobs", 0))
+
+                # L'API retourne une structure imbriquée pour les embeddings
+                embeddings_data = stats.get("embeddings", {})
+                col2.metric(
+                    "Avec embeddings", embeddings_data.get("with_embeddings", 0)
+                )
+                col3.metric(
+                    "Sans embeddings", embeddings_data.get("without_embeddings", 0)
+                )
+                col4.metric(
+                    "Taux d'indexation",
+                    f"{embeddings_data.get('percentage_indexed', 0):.1f}%",
+                )
+
+                # Répartition par source
+                if "by_source" in stats:
+                    st.markdown("**Répartition par source :**")
+                    for source, count in stats["by_source"].items():
+                        st.write(f"- {source}: {count} offres")
+
+            elif response.status_code == 403:
+                st.error("❌ API Key invalide")
+            else:
+                st.error(f"❌ Erreur: {response.status_code}")
+
+        except Exception as e:
+            st.error(f"❌ Erreur: {str(e)}")
+
+    st.markdown("---")
+    st.warning(
+        "⚠️ **Attention** : La collecte peut prendre plusieurs minutes selon le nombre de mots-clés et les sources activées."
+    )
+
+# ============================================================================
+# PAGE 5: À PROPOS
 # ============================================================================
 elif page == "ℹ️ À propos":
     st.header("ℹ️ À propos de CV-Optimizer")

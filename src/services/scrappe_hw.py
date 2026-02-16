@@ -55,6 +55,10 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
         driver.get("https://www.hellowork.com/fr-fr/")
         time.sleep(1)
 
+        logger.debug(
+            f"Keywords dans scrape_hellowork : {keywords} (type: {type(keywords)})"
+        )
+
         # Accepter les cookies
         try:
             WebDriverWait(driver, 5).until(
@@ -277,6 +281,9 @@ def run_hw_scraper(
 
     try:
         # 1. Lancement du scraping
+        logger.debug(
+            f"Keywords reçus par run_hw_scraper : {keywords_to_fetch} (type: {type(keywords_to_fetch)})"
+        )
         scraped_offers = scrape_hellowork(
             keywords=keywords_to_fetch,
             max_offres_per_kw=max_offres_per_kw,
@@ -310,9 +317,9 @@ def run_hw_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["Data Scientist credit agricole"]
+    keywords_to_test = ["Data Scientist", "Data Engineer"]
     offers = run_hw_scraper(
-        keywords_to_test, max_offres_per_kw=3, save_to_db=True, headless=False
+        keywords_to_test, max_offres_per_kw=3, save_to_db=True, headless=True
     )
 
     print(f"\nRésultat : {len(offers)} offres traitées")
