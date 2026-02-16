@@ -12,7 +12,6 @@ from loguru import logger
 
 from app.schemas.job import JobResponse, JobFilter, JobListResponse
 from app.api.deps import get_db
-from app.core.exceptions import NoMatchFoundError
 
 # Import du modèle
 from src.database.models import JobOffer
@@ -50,11 +49,14 @@ async def get_jobs(
     - experience : "D" (Débutant), "E", "S"
     - source : "France Travail", "HelloWork", "Welcome to the Jungle"
     - keywords : Recherche dans le titre (ex: "Python", "Data")
-    - days_limit : Limiter aux N derniers jours (défaut: 30)
+    - days_limit : Limiter aux N derniers jours (défaut: 30, basé sur la date d'insertion en base)
 
     **Pagination** :
     - page : Numéro de page (commence à 1)
     - page_size : Nombre de résultats par page (1-100, défaut: 20)
+
+    **Note** : Le filtre days_limit utilise la date d'insertion en base (created_at),
+    ce qui permet d'inclure toutes les sources (France Travail, HelloWork, WTTJ).
 
     **Exemple d'utilisation** :
     ```bash
@@ -69,22 +71,23 @@ async def get_jobs(
         experience: Filtre expérience (optionnel)
         source: Filtre source (optionnel)
         keywords: Recherche mots-clés (optionnel)
-        days_limit: Limite de jours (défaut: 30)
+        days_limit: Limite de jours (défaut: 30, basé sur created_at)
         db: Session DB (injecté)
 
     Returns:
         JobListResponse: Liste paginée d'offres avec métadonnées
 
     Raises:
-        NoMatchFoundError: Aucune offre avec ces filtres
+        Retourne une liste vide si aucune offre ne correspond
     """
 
     # Construction de la requête de base
     query = db.query(JobOffer)
 
-    # Filtre sur la date d'actualisation (offres récentes)
+    # Filtre sur la date d'insertion en base (created_at)
+    # Cette date existe pour toutes les sources (France Travail, HelloWork, WTTJ)
     limit_date = datetime.now() - timedelta(days=days_limit)
-    query = query.filter(JobOffer.actualisation_date >= limit_date)
+    query = query.filter(JobOffer.created_at >= limit_date)
 
     # Application des filtres optionnels
     filters_applied = {}
@@ -116,16 +119,38 @@ async def get_jobs(
         )
         filters_applied["keywords"] = keywords
 
-    # Tri par date de mise à jour décroissante
-    query = query.order_by(JobOffer.actualisation_date.desc())
+    # Tri par date d'insertion en base décroissante (plus récentes en premier)
+    query = query.order_by(JobOffer.created_at.desc())
 
     # Compte total (avant pagination)
     total = query.count()
 
+    # Si aucun résultat, retourner une réponse vide au lieu d'une erreur
     if total == 0:
-        raise NoMatchFoundError(
-            message="Aucune offre ne correspond à ces critères.",
-            detail={"filters": filters_applied, "days_limit": days_limit},
+        logger.info(
+            f"Aucune offre trouvée avec les filtres: {filters_applied}, days_limit={days_limit}"
+        )
+
+        # Construction des filtres appliqués
+        filter_obj = None
+        if filters_applied:
+            filter_obj = JobFilter(
+                location=filters_applied.get("location"),
+                contract_type=filters_applied.get("contract_type"),
+                experience=filters_applied.get("experience"),
+                source=filters_applied.get("source"),
+                keywords=filters_applied.get("keywords"),
+                days_limit=days_limit,
+            )
+
+        # Retourner une réponse vide avec total=0
+        return JobListResponse(
+            jobs=[],
+            total=0,
+            page=1,
+            page_size=page_size,
+            total_pages=0,
+            filters_applied=filter_obj,
         )
 
     # Calcul de la pagination
