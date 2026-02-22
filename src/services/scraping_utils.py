@@ -72,7 +72,7 @@ def get_existing_ids(db_session) -> set:
 
 
 def clean_description(html_text: str) -> str:
-    """Nettoie et normalise une description HTML en texte brut.
+    """Nettoie et normalise une description HTML en texte brut pour des offres d'IT.
 
     La fonction :
         - extrait le texte depuis le HTML,
@@ -92,31 +92,34 @@ def clean_description(html_text: str) -> str:
     if not html_text:
         return ""
 
-    # Extraction HTML
+    # 1. Extraction HTML
     soup = BeautifulSoup(html_text, "html.parser")
     text = soup.get_text(separator=" ")
 
-    # Normalisation Unicode (NFC est préférable pour le français)
+    # 2. Normalisation Unicode (NFC)
     text = unicodedata.normalize("NFC", text)
 
-    # Standardisation des apostrophes AVANT le filtrage
-    # On remplace tous les types d'apostrophes par l'apostrophe droite '
+    # 3. Standardisation des apostrophes
     text = re.sub(r"[’‘`´]", "'", text)
 
-    # Suppression des caractères de contrôle (on garde les sauts de ligne transformés en espaces)
+    # 4. Suppression des caractères de contrôle
     text = "".join(
         ch for ch in text if unicodedata.category(ch)[0] != "C" or ch in ["\n", "\t"]
     )
 
-    # Filtrage Regex mis à jour (On ajoute + et # pour l'informatique)
-    # Et on s'assure que l'apostrophe droite est bien là
-    text = re.sub(r'[^\w\s\.,;:\-\(\)@\'"&#\+]', " ", text)
+    # 5. Filtrage Regex mis à jour : On garde / pour CI/CD et les noms de fichiers
+    # Le tiret \- est à la fin pour éviter les erreurs d'intervalle
+    text = re.sub(r'[^\w\s.,;:()@\'"&#+\-/]', " ", text)
 
-    # Correction du bégaiement (l'espace après l'apostrophe créé par un mauvais nettoyage)
-    # d ' optimiser -> d'optimiser
-    text = re.sub(r"([ldnjmtsqLDNJMTSQ])\s+'\s*", r"\1'", text)
+    # 6. Correction du bégaiement (ex: d ' optimiser -> d'optimiser)
+    # Supporte désormais tous les accents français
+    text = re.sub(
+        r"\b([ldnjmtsqLDNJMTSQ])\s*'\s*(?=[aeiouyâêîôûhéèàëïAEIOUYÂÊÎÔÛHÉÈÀËÏ])",
+        r"\1'",
+        text,
+    )
 
-    # Nettoyage des espaces multiples
+    # 7. Nettoyage des espaces multiples
     text = re.sub(r"\s+", " ", text)
 
     return text.strip()
