@@ -72,33 +72,54 @@ def get_existing_ids(db_session) -> set:
 
 
 def clean_description(html_text: str) -> str:
-    """
-    Nettoie la description HTML pour ne garder que le contenu textuel utile.
-    Combine la suppression HTML (BeautifulSoup) + nettoyage Unicode.
+    """Nettoie et normalise une description HTML en texte brut pour des offres d'IT.
+
+    La fonction :
+        - extrait le texte depuis le HTML,
+        - normalise les caractères Unicode (NFC),
+        - unifie les différents types d'apostrophes,
+        - supprime les caractères de contrôle indésirables,
+        - filtre les caractères non pertinents via regex,
+        - et nettoie les espaces superflus.
 
     Args:
-        html_text: Texte potentiellement HTML à nettoyer
+        html_text: Contenu HTML de la description à nettoyer. Peut être une chaîne vide ou None.
 
     Returns:
-        Texte nettoyé
+        str: Description nettoyée en texte brut. Retourne une chaîne vide si l'entrée est vide ou None.
     """
+
     if not html_text:
         return ""
 
-    # Suppression des balises HTML
+    # 1. Extraction HTML
     soup = BeautifulSoup(html_text, "html.parser")
     text = soup.get_text(separator=" ")
 
-    # Normalisation Unicode (accents, caractères spéciaux)
-    text = unicodedata.normalize("NFKC", text)
+    # 2. Normalisation Unicode (NFC)
+    text = unicodedata.normalize("NFC", text)
 
-    # Suppression des caractères de contrôle et non-imprimables
-    text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
+    # 3. Standardisation des apostrophes
+    text = re.sub(r"[’‘`´]", "'", text)
 
-    # Garde lettres, chiffres, ponctuations de base et espaces
-    text = re.sub(r'[^\w\s\.,;:\-\(\)@\'"&]', " ", text, flags=re.UNICODE)
+    # 4. Suppression des caractères de contrôle
+    text = "".join(
+        ch for ch in text if unicodedata.category(ch)[0] != "C" or ch in ["\n", "\t"]
+    )
 
-    # Nettoyage des espaces multiples
+    # 5. Filtrage Regex mis à jour : On garde / pour CI/CD et les noms de fichiers
+    # Le tiret \- est à la fin pour éviter les erreurs d'intervalle
+    text = re.sub(r'[^\w\s.,;:()@\'"&#+\-/]', " ", text)
+
+    # 6. Correction du bégaiement (ex: d ' optimiser -> d'optimiser)
+    # Supporte désormais tous les accents français
+    text = re.sub(
+        r"\b([ldnjmtsqLDNJMTSQ])\s*'\s*(?=[aeiouyâêîôûhéèàëïAEIOUYÂÊÎÔÛHÉÈÀËÏ])",
+        r"\1'",
+        text,
+    )
+
+    # 7. Nettoyage des espaces multiples
     text = re.sub(r"\s+", " ", text)
 
     return text.strip()
