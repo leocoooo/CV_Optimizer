@@ -71,32 +71,33 @@ def get_existing_ids(db_session) -> set:
     return {offer.id for offer in db_session.query(JobOffer.id).all()}
 
 
-def clean_description(html_text: str) -> str:
-    """
-    Nettoie la description HTML pour ne garder que le contenu textuel utile.
-    Combine la suppression HTML (BeautifulSoup) + nettoyage Unicode.
-
-    Args:
-        html_text: Texte potentiellement HTML à nettoyer
-
-    Returns:
-        Texte nettoyé
-    """
+def clean_description_fixed(html_text: str) -> str:
     if not html_text:
         return ""
 
-    # Suppression des balises HTML
+    # Extraction HTML
     soup = BeautifulSoup(html_text, "html.parser")
     text = soup.get_text(separator=" ")
 
-    # Normalisation Unicode (accents, caractères spéciaux)
-    text = unicodedata.normalize("NFKC", text)
+    # Normalisation Unicode (NFC est préférable pour le français)
+    text = unicodedata.normalize("NFC", text)
 
-    # Suppression des caractères de contrôle et non-imprimables
-    text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
+    # Standardisation des apostrophes AVANT le filtrage
+    # On remplace tous les types d'apostrophes par l'apostrophe droite '
+    text = re.sub(r"[’‘`´]", "'", text)
 
-    # Garde lettres, chiffres, ponctuations de base et espaces
-    text = re.sub(r'[^\w\s\.,;:\-\(\)@\'"&]', " ", text, flags=re.UNICODE)
+    # Suppression des caractères de contrôle (on garde les sauts de ligne transformés en espaces)
+    text = "".join(
+        ch for ch in text if unicodedata.category(ch)[0] != "C" or ch in ["\n", "\t"]
+    )
+
+    # Filtrage Regex mis à jour (On ajoute + et # pour l'informatique !)
+    # Et on s'assure que l'apostrophe droite est bien là
+    text = re.sub(r'[^\w\s\.,;:\-\(\)@\'"&#\+]', " ", text)
+
+    # Correction du bégaiement (l'espace après l'apostrophe créé par un mauvais nettoyage)
+    # d ' optimiser -> d'optimiser
+    text = re.sub(r"([ldnjmtsqLDNJMTSQ])\s+'\s*", r"\1'", text)
 
     # Nettoyage des espaces multiples
     text = re.sub(r"\s+", " ", text)
