@@ -71,7 +71,7 @@ def get_existing_ids(db_session) -> set:
     return {offer.id for offer in db_session.query(JobOffer.id).all()}
 
 
-def clean_description_fixed(html_text: str) -> str:
+def clean_description(html_text: str) -> str:
     if not html_text:
         return ""
 
