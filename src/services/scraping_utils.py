@@ -72,6 +72,23 @@ def get_existing_ids(db_session) -> set:
 
 
 def clean_description(html_text: str) -> str:
+    """Nettoie et normalise une description HTML en texte brut.
+
+    La fonction :
+        - extrait le texte depuis le HTML,
+        - normalise les caractères Unicode (NFC),
+        - unifie les différents types d'apostrophes,
+        - supprime les caractères de contrôle indésirables,
+        - filtre les caractères non pertinents via regex,
+        - et nettoie les espaces superflus.
+
+    Args:
+        html_text: Contenu HTML de la description à nettoyer. Peut être une chaîne vide ou None.
+
+    Returns:
+        str: Description nettoyée en texte brut. Retourne une chaîne vide si l'entrée est vide ou None.
+    """
+
     if not html_text:
         return ""
 
@@ -91,7 +108,7 @@ def clean_description(html_text: str) -> str:
         ch for ch in text if unicodedata.category(ch)[0] != "C" or ch in ["\n", "\t"]
     )
 
-    # Filtrage Regex mis à jour (On ajoute + et # pour l'informatique !)
+    # Filtrage Regex mis à jour (On ajoute + et # pour l'informatique)
     # Et on s'assure que l'apostrophe droite est bien là
     text = re.sub(r'[^\w\s\.,;:\-\(\)@\'"&#\+]', " ", text)
 
