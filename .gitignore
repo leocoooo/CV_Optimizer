@@ -8,3 +8,4 @@ src/services/pycache/
 data/scrapping/
 explanation_API/
 data/.DS_Store
+*.md
