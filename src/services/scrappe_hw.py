@@ -1,6 +1,6 @@
 import time
-import json
 import re
+from datetime import datetime
 from loguru import logger
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -121,10 +121,15 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                     time.sleep(1.5)
 
                     try:
-                        # Extraction des données brutes
-                        raw_data = {"url": link, "source": "HelloWork"}
+                        # ========== EXTRACTION DES DONNÉES ==========
+                        raw_data = {
+                            "url": link,
+                            "source": "HelloWork",
+                            "date_scraping": datetime.now().isoformat(),
+                        }
 
-                        # Titre
+                        # ===== POSTE =====
+                        # Titre de l'offre
                         try:
                             raw_data["title"] = driver.find_element(
                                 By.CSS_SELECTOR, "[data-cy='jobTitle']"
@@ -140,31 +145,45 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         except Exception:
                             raw_data["company"] = "Non spécifié"
 
-                        # Date de création
-                        try:
-                            date_element = driver.find_element(
-                                By.XPATH, "//span[contains(text(), 'Publiée le')]"
-                            )
-                            date_text = date_element.text
-                            match_date = re.search(r"(\d{2}/\d{2}/\d{4})", date_text)
-                            raw_data["creation_date"] = (
-                                match_date.group(1) if match_date else None
-                            )
-                        except Exception:
-                            raw_data["creation_date"] = None
-
-                        # Tags (Contract, Experience, Location)
+                        # Extraction des tags (contrat, expérience, localisation, éducation, secteur, télétravail)
                         raw_data["contract_type"] = None
                         raw_data["required_experience"] = None
                         raw_data["location"] = None
+                        raw_data["required_education"] = None
+                        raw_data["sector"] = None
+                        raw_data["remote_mode"] = None
+                        raw_data["salary"] = None
+
+                        # Extraction du salaire depuis le bouton
+                        try:
+                            salary_btn = driver.find_element(
+                                By.CSS_SELECTOR, "button[data-cy='salary-tag-button']"
+                            )
+                            salary_text = salary_btn.text.strip()
+                            if "€" in salary_text:
+                                # Extraire juste la partie salaire (après la flèche)
+                                salary_match = re.search(
+                                    r"→\s*(.+?)(?:\s*/\s*an)?$", salary_text
+                                )
+                                if salary_match:
+                                    raw_data["salary"] = salary_match.group(1).strip()
+                                else:
+                                    raw_data["salary"] = salary_text
+                        except Exception:
+                            pass
 
                         tags = driver.find_elements(
                             By.CSS_SELECTOR, "li.tw-tag-secondary-s"
                         )
+                        uncategorized_tags = []
+
                         for tag in tags:
-                            val = tag.text
+                            val = tag.text.strip()
+
+                            # Expérience (contient "ans" ou "exp.")
                             if "ans" in val.lower() or "exp." in val.lower():
                                 raw_data["required_experience"] = val
+                            # Type de contrat
                             elif val in [
                                 "CDI",
                                 "CDD",
@@ -173,21 +192,72 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                                 "Intérim",
                             ]:
                                 raw_data["contract_type"] = val
-                            elif raw_data["location"] is None:
-                                raw_data["location"] = val
+                            # Éducation (Bac + X)
+                            elif "bac" in val.lower():
+                                raw_data["required_education"] = val
+                            # Télétravail (contient "télétravail" ou "remote" ou "télé")
+                            elif any(
+                                x in val.lower()
+                                for x in ["télétravail", "télé", "remote"]
+                            ):
+                                raw_data["remote_mode"] = val
+                            # Salaire (contient € ou €)
+                            elif "€" in val:
+                                raw_data["salary"] = val
+                            else:
+                                uncategorized_tags.append(val)
 
-                        # Description
+                        # Classification des tags non catégorisés: location vs secteur
+                        for tag in uncategorized_tags:
+                            # Location: contient code postal (5 chiffres) ou département (- XX)
+                            if re.search(r"\d{5}", tag) or re.search(
+                                r"-\s*\d{1,2}", tag
+                            ):
+                                raw_data["location"] = tag
+                            # Secteur: reste (contient symboles industrie ou pas de pattern location)
+                            elif raw_data["sector"] is None:
+                                raw_data["sector"] = tag
+                            elif raw_data["location"] is None:
+                                raw_data["location"] = tag
+
+                        # ===== LOCALISATION =====
+                        raw_data["location_address"] = (
+                            None  # Non disponible sur HelloWork
+                        )
+                        raw_data["location_country"] = "France"
+
+                        # ===== CONTENU (AVANT de changer d'onglet) =====
+                        # Description principale - EXTRAIRE AVANT de cliquer sur L'entreprise
                         description_text = ""
                         try:
-                            desc = driver.find_element(
-                                By.CSS_SELECTOR,
-                                "div[data-truncate-text-target='content']",
+                            # Essayer de cliquer sur "Voir plus" si le bouton existe
+                            try:
+                                show_more_btn = driver.find_element(
+                                    By.XPATH,
+                                    "//button[contains(text(), 'Voir plus') and ancestor::section]",
+                                )
+                                driver.execute_script(
+                                    "arguments[0].click();", show_more_btn
+                                )
+                                time.sleep(0.5)
+                            except Exception:
+                                pass
+
+                            # Extraire la description
+                            desc_elements = driver.find_elements(
+                                By.XPATH,
+                                "//div[@data-truncate-text-target='content']//p | //section//div[@class]//p[contains(@class, 'tw-typo-long-m')]",
                             )
-                            description_text = desc.text
+                            if desc_elements:
+                                description_text = desc_elements[0].text.strip()
                         except Exception:
                             pass
 
-                        # Profil recherché (compétences)
+                        # Missions et profil
+                        job_mission = ""
+                        job_profile = ""
+
+                        # Extraction des sections "Les missions", "Le profil recherché" si présentes
                         try:
                             bouton_profil = driver.find_element(
                                 By.XPATH,
@@ -200,29 +270,142 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             profil_content = driver.find_element(
                                 By.CSS_SELECTOR, "#collapsed-content p.tw-typo-long-m"
                             )
-                            description_text += " " + profil_content.text
+                            job_profile = profil_content.text
                         except Exception:
                             pass
 
+                        # Agrégation de la description
                         raw_data["description"] = description_text
+                        raw_data["job_mission"] = job_mission if job_mission else None
+                        raw_data["job_profile"] = job_profile if job_profile else None
 
-                        # Construction de la row finale (l'ID est déjà extrait de l'URL)
+                        # ===== COMPÉTENCES =====
+                        raw_data["competences"] = job_profile if job_profile else None
+
+                        # ===== AVANTAGES & RÉMUNÉRATION =====
+                        raw_data["benefits"] = None
+
+                        # ===== DATE DE PUBLICATION (avant de changer d'onglet) =====
+                        raw_data["date_publication"] = None
+                        try:
+                            date_element = driver.find_element(
+                                By.XPATH, "//span[contains(text(), 'Publiée le')]"
+                            )
+                            date_text = date_element.text
+                            match_date = re.search(r"(\d{2}/\d{2}/\d{4})", date_text)
+                            if match_date:
+                                raw_data["date_publication"] = match_date.group(1)
+                        except Exception:
+                            pass
+
+                        # ===== ENTREPRISE (APRÈS avoir extrait le contenu du job) =====
+                        raw_data["company_size"] = None
+                        raw_data["company_sector"] = None
+                        raw_data["company_website"] = None
+
+                        # Extraction des données compagnie depuis l'onglet "L'entreprise"
+                        try:
+                            company_tab_btn = WebDriverWait(driver, 5).until(
+                                EC.element_to_be_clickable(
+                                    (
+                                        By.CSS_SELECTOR,
+                                        "button[data-cy='companyTabButton']",
+                                    )
+                                )
+                            )
+                            driver.execute_script(
+                                "arguments[0].click();", company_tab_btn
+                            )
+                            time.sleep(1)
+
+                            # Attendre le chargement du contenu de l'onglet
+                            WebDriverWait(driver, 5).until(
+                                EC.visibility_of_element_located(
+                                    (By.CSS_SELECTOR, "div[id='company-panel']")
+                                )
+                            )
+                            time.sleep(0.5)
+
+                            # Extraction de la taille de l'entreprise
+                            try:
+                                size_span = driver.find_element(
+                                    By.XPATH,
+                                    "//span[contains(text(), 'Salariés')]/following-sibling::span[contains(@class, 'tw-typo-m-bold')]",
+                                )
+                                raw_data["company_size"] = size_span.text.strip()
+                            except Exception:
+                                pass
+
+                            # Extraction de la politique de télétravail
+                            try:
+                                remote_span = driver.find_element(
+                                    By.XPATH,
+                                    "//span[contains(text(), 'Politique de télétravail')]/following-sibling::span[contains(@class, 'tw-typo-m-bold')]",
+                                )
+                                remote_text = remote_span.text.strip()
+                                if raw_data["remote_mode"] is None:
+                                    raw_data["remote_mode"] = remote_text
+                            except Exception:
+                                pass
+
+                            # Extraction du site web si présent dans la description
+                            try:
+                                company_desc = driver.find_element(
+                                    By.XPATH,
+                                    "//div[contains(@class, 'truncate-text')]//p",
+                                )
+                                desc_text = company_desc.text
+                                website_match = re.search(
+                                    r"(https?://[^\s]+|www\.[^\s]+)", desc_text
+                                )
+                                if website_match:
+                                    raw_data["company_website"] = website_match.group(
+                                        1
+                                    ).rstrip()
+                            except Exception:
+                                pass
+
+                        except Exception as e:
+                            logger.debug(
+                                f"Erreur lors de l'extraction des données compagnie: {e}"
+                            )
+                            pass
+
+                        # ========== CONSTRUCTION DE LA ROW FINALE ==========
                         row = {
+                            # IDENTIFIANTS
                             "id": job_id,
-                            "title": raw_data.get("title", "Sans titre"),
-                            "company": raw_data.get("company", "Non spécifié"),
-                            "location": raw_data.get("location"),
                             "url": link,
                             "source": "HelloWork",
+                            "date_publication": raw_data.get("date_publication"),
+                            "date_scraping": raw_data.get("date_scraping"),
+                            # POSTE
+                            "title": raw_data.get("title", "Sans titre"),
+                            "sector": raw_data.get("sector"),
+                            "contract_type": raw_data.get("contract_type"),
+                            "remote_mode": raw_data.get("remote_mode"),
+                            # LOCALISATION
+                            "location": raw_data.get("location"),
+                            "location_address": raw_data.get("location_address"),
+                            "location_country": raw_data.get("location_country"),
+                            # ENTREPRISE
+                            "company": raw_data.get("company", "Non spécifié"),
+                            "company_size": raw_data.get("company_size"),
+                            "company_sector": raw_data.get("company_sector"),
+                            "company_website": raw_data.get("company_website"),
+                            # PROFIL DEMANDÉ
+                            "required_experience": raw_data.get("required_experience"),
+                            "required_education": raw_data.get("required_education"),
+                            "competences": raw_data.get("competences"),
+                            # RÉMUNÉRATION & AVANTAGES
+                            "salary": raw_data.get("salary"),
+                            "benefits": raw_data.get("benefits"),
+                            # CONTENU
                             "description": clean_description(
                                 raw_data.get("description")
                             ),
-                            "creation_date": raw_data.get("creation_date"),
-                            "contract_type": raw_data.get("contract_type"),
-                            "required_experience": raw_data.get("required_experience"),
-                            "contact": None,
-                            "actualisation_date": None,
-                            "raw_json": json.dumps(raw_data, ensure_ascii=False),
+                            "job_mission": raw_data.get("job_mission"),
+                            "job_profile": raw_data.get("job_profile"),
                         }
 
                         all_data.append(row)
@@ -317,9 +500,10 @@ def run_hw_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["Data Scientist", "Data Engineer"]
+    keywords_to_test = ["Data Scientist"]
     offers = run_hw_scraper(
-        keywords_to_test, max_offres_per_kw=3, save_to_db=True, headless=True
+        keywords_to_test, max_offres_per_kw=1, save_to_db=False, headless=True
     )
 
-    print(f"\nRésultat : {len(offers)} offres traitées")
+    print(f"\nRésultat : {len(offers)} offre(s) traité(es)")
+    print(offers[0] if offers else "Aucune offre trouvée")
