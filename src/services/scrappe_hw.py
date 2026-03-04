@@ -22,6 +22,128 @@ from src.services.scraping_utils import (
 # Configuration du logger
 setup_logger(level="DEBUG")
 
+# ===== TAGS HELLOWORK CODÉS EN DUR =====
+# Source: spec.md
+
+# Types de contrat possibles
+CONTRACT_TYPES = {
+    "CDI",
+    "CDD",
+    "Alternance",
+    "Stage",
+    "Intérim",
+    "Freelance",
+    "Indépendant",
+    "Fonctionnaire",
+    "Franchise",
+    "Associé",
+    "Stage de lycée",
+}
+
+# Niveaux d'éducation (Bac + X)
+EDUCATION_LEVELS = {
+    "Bac +2",
+    "Bac +3",
+    "Bac +4",
+    "Bac +5",
+    "CAP",
+    "BEP",
+    "Bac",
+    "Bac +0",
+    "Bac +1",
+}
+
+# Modes télétravail possibles
+REMOTE_MODES = {
+    "Télétravail total",
+    "Télétravail partiel",
+    "Partiel possible",
+    "Sans télétravail",
+    "À distance",
+    "Sur site",
+}
+
+# FONCTIONS (à inclure dans sector)
+FUNCTIONS = {
+    "Achat • Logistique",
+    "Achat",
+    "Logistique • Métiers du Transport",
+    "Administration",
+    "Assistanat • Adm.ventes • Accueil",
+    "Compta • Gestion • Finance • Audit",
+    "Direction • Resp. Co. et Centre de Profit",
+    "Juridique • Droit",
+    "Métiers de la Fonction Publique",
+    "RH • Personnel • Formation",
+    "BTP • Bureau d'études",
+    "BTP • Gros Oeuvre • Second Oeuvre",
+    "Bureau d'Etudes • R&D • BTP archi • conception",
+    "Commerce",
+    "Commercial • Technico • Commercial",
+    "Commercial auprès des particuliers",
+    "Commercial auprès des professionnels",
+    "Commercial • Vendeur en magasin",
+    "Import • Export • International",
+    "Métiers de la distribution • Management • Resp.",
+    "Négociation • Gestion immobilière",
+    "Informatique",
+    "Informatique • Dével. Hardware",
+    "Informatique • Développement",
+    "Informatique • Systèmes d'Information",
+    "Informatique • Systèmes • Réseaux",
+    "Ingénierie industrielle",
+    "Ingénierie • Agro • Agri",
+    "Ingénierie • Chimie • Pharmacie • Bio.",
+    "Ingénierie • Electro • tech. • Automat.",
+    "Ingénierie • Mécanique • Aéron.",
+    "Ingénierie • Telecoms • Electronique",
+    "Marketing • Communication • Graphisme",
+    "Production",
+    "Production • Gestion • Maintenance",
+    "Production • Opérateur • Manoeuvre",
+    "Qualité • Hygiène • Sécurité • Environnement",
+    "Restauration • Tourisme • Hôtellerie • Loisirs",
+    "Santé • Social",
+    "Support (SAV • Hotline)",
+    "SAV • Hotline • Téléconseiller",
+}
+
+# SECTEURS D'ACTIVITÉ (à inclure dans sector)
+ACTIVITY_SECTORS = {
+    "Agriculture • Pêche",
+    "BTP",
+    "Banque • Assurance • Finance",
+    "Distribution • Commerce de gros",
+    "Enseignement • Formation",
+    "Immobilier",
+    "Industrie Agro • alimentaire",
+    "Industrie Auto • Meca • Navale",
+    "Industrie Aéronautique • Aérospatial",
+    "Industrie Manufacturière",
+    "Industrie Pharmaceutique • Biotechn. • Chimie",
+    "Industrie Pétrolière • Pétrochimie",
+    "Industrie high • tech • Telecom",
+    "Média • Internet • Communication",
+    "Restauration",
+    "Santé • Social • Association",
+    "Secteur Energie • Environnement",
+    "Secteur informatique • ESN",
+    "Service public autres",
+    "Service public d'état",
+    "Service public des collectivités territoriales",
+    "Service public hospitalier",
+    "Services aux Entreprises",
+    "Services aux Personnes • Particuliers",
+    "Tourisme • Hôtellerie • Loisirs",
+    "Transport • Logistique",
+}
+
+# Ensemble combiné pour matching
+SECTORS_AND_FUNCTIONS = FUNCTIONS | ACTIVITY_SECTORS
+
+# Pattern pour expérience (chercher "X ans" ou "Exp. X")
+EXPERIENCE_PATTERN = r"(?:Exp\.|\d+)\s*(?:à|à|-|–)?\s*\d+\s*ans"
+
 
 def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=None):
     """
@@ -150,7 +272,9 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         raw_data["required_experience"] = None
                         raw_data["location"] = None
                         raw_data["required_education"] = None
-                        raw_data["sector"] = None
+                        raw_data[
+                            "sector"
+                        ] = []  # Liste pour accumuler tous les secteurs/fonctions
                         raw_data["remote_mode"] = None
                         raw_data["salary"] = None
 
@@ -166,9 +290,13 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                                     r"→\s*(.+?)(?:\s*/\s*an)?$", salary_text
                                 )
                                 if salary_match:
-                                    raw_data["salary"] = salary_match.group(1).strip()
+                                    salary_clean = salary_match.group(1).strip()
+                                    # Nettoyer les espaces insécables (\u202f) et autres caractères spéciaux
+                                    salary_clean = salary_clean.replace("\u202f", " ")
+                                    raw_data["salary"] = salary_clean
                                 else:
-                                    raw_data["salary"] = salary_text
+                                    salary_clean = salary_text.replace("\u202f", " ")
+                                    raw_data["salary"] = salary_clean
                         except Exception:
                             pass
 
@@ -180,30 +308,29 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         for tag in tags:
                             val = tag.text.strip()
 
-                            # Expérience (contient "ans" ou "exp.")
-                            if "ans" in val.lower() or "exp." in val.lower():
-                                raw_data["required_experience"] = val
-                            # Type de contrat
-                            elif val in [
-                                "CDI",
-                                "CDD",
-                                "Alternance",
-                                "Stage",
-                                "Intérim",
-                            ]:
+                            # Type de contrat (matching exact pour robustesse)
+                            if val in CONTRACT_TYPES:
                                 raw_data["contract_type"] = val
                             # Éducation (Bac + X)
-                            elif "bac" in val.lower():
+                            elif any(x in val.lower() for x in ["bac", "cap", "bep"]):
                                 raw_data["required_education"] = val
-                            # Télétravail (contient "télétravail" ou "remote" ou "télé")
-                            elif any(
+                            # Télétravail (matching pour les modes définis)
+                            elif val in REMOTE_MODES or any(
                                 x in val.lower()
-                                for x in ["télétravail", "télé", "remote"]
+                                for x in ["télétravail", "télé", "remote", "distance"]
                             ):
                                 raw_data["remote_mode"] = val
-                            # Salaire (contient € ou €)
+                            # Salaire (contient €)
                             elif "€" in val:
-                                raw_data["salary"] = val
+                                # Nettoyer les espaces insécables
+                                salary_clean = val.replace("\u202f", " ")
+                                raw_data["salary"] = salary_clean
+                            # Expérience (pattern spécifique: "X ans" ou "Exp. X")
+                            elif re.search(EXPERIENCE_PATTERN, val, re.IGNORECASE):
+                                raw_data["required_experience"] = val
+                            # Secteur et Fonctions (mapping exact pour robustesse) - accumuler tous
+                            elif val in SECTORS_AND_FUNCTIONS:
+                                raw_data["sector"].append(val)
                             else:
                                 uncategorized_tags.append(val)
 
@@ -214,9 +341,9 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                                 r"-\s*\d{1,2}", tag
                             ):
                                 raw_data["location"] = tag
-                            # Secteur: reste (contient symboles industrie ou pas de pattern location)
-                            elif raw_data["sector"] is None:
-                                raw_data["sector"] = tag
+                            # Secteur: reste (pas de pattern location) - ajouter à la liste
+                            elif len(raw_data["sector"]) == 0:
+                                raw_data["sector"].append(tag)
                             elif raw_data["location"] is None:
                                 raw_data["location"] = tag
 
@@ -257,7 +384,7 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         job_mission = ""
                         job_profile = ""
 
-                        # Extraction des sections "Les missions", "Le profil recherché" si présentes
+                        # Extraction des sections "Le profil recherché" - format BUTTON (ancien)
                         try:
                             bouton_profil = driver.find_element(
                                 By.XPATH,
@@ -272,7 +399,26 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             )
                             job_profile = profil_content.text
                         except Exception:
-                            pass
+                            # Format DETAILS (nouveau) - balise HTML5 <details>
+                            try:
+                                profile_details = driver.find_element(
+                                    By.XPATH,
+                                    "//summary[contains(., 'Le profil recherché')]/ancestor::details",
+                                )
+                                # Cliquer sur la balise summary pour dérouler
+                                summary = profile_details.find_element(
+                                    By.CSS_SELECTOR, "summary"
+                                )
+                                driver.execute_script("arguments[0].click();", summary)
+                                time.sleep(0.5)
+
+                                # Extraire le contenu du profil
+                                profil_content = profile_details.find_element(
+                                    By.CSS_SELECTOR, "p.tw-typo-long-m"
+                                )
+                                job_profile = profil_content.text
+                            except Exception:
+                                pass
 
                         # Agrégation de la description
                         raw_data["description"] = description_text
@@ -280,32 +426,31 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         raw_data["job_profile"] = job_profile if job_profile else None
 
                         # ===== COMPÉTENCES =====
-                        raw_data["competences"] = job_profile if job_profile else None
+                        # Note: job_profile contient le profil complet, competences reste None
+                        raw_data["competences"] = None
 
                         # ===== AVANTAGES & RÉMUNÉRATION =====
                         raw_data["benefits"] = None
 
                         # ===== DATE DE PUBLICATION (avant de changer d'onglet) =====
                         raw_data["date_publication"] = None
-                        try:
-                            date_element = driver.find_element(
-                                By.XPATH, "//span[contains(text(), 'Publiée le')]"
-                            )
-                            date_text = date_element.text
-                            match_date = re.search(r"(\d{2}/\d{2}/\d{4})", date_text)
-                            if match_date:
-                                raw_data["date_publication"] = match_date.group(1)
-                        except Exception:
-                            pass
+                        # Note: Laisser à None car l'extraction est inconsistente selon la page
 
-                        # ===== ENTREPRISE (APRÈS avoir extrait le contenu du job) =====
+                        # ===== CONVERSION DES LISTES EN STRINGS =====
+                        # Convertir la liste de secteurs/fonctions en string avec séparateur
+                        if raw_data["sector"]:
+                            raw_data["sector"] = " - ".join(raw_data["sector"])
+                        else:
+                            raw_data["sector"] = None
+
+                        # ===== ENTREPRISE =====
                         raw_data["company_size"] = None
                         raw_data["company_sector"] = None
                         raw_data["company_website"] = None
 
-                        # Extraction des données compagnie depuis l'onglet "L'entreprise"
+                        # Extraction des données compagnie depuis l'onglet "L'entreprise" (optionnel)
                         try:
-                            company_tab_btn = WebDriverWait(driver, 5).until(
+                            company_tab_btn = WebDriverWait(driver, 3).until(
                                 EC.element_to_be_clickable(
                                     (
                                         By.CSS_SELECTOR,
@@ -319,7 +464,7 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             time.sleep(1)
 
                             # Attendre le chargement du contenu de l'onglet
-                            WebDriverWait(driver, 5).until(
+                            WebDriverWait(driver, 3).until(
                                 EC.visibility_of_element_located(
                                     (By.CSS_SELECTOR, "div[id='company-panel']")
                                 )
@@ -365,10 +510,10 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             except Exception:
                                 pass
 
-                        except Exception as e:
-                            logger.debug(
-                                f"Erreur lors de l'extraction des données compagnie: {e}"
-                            )
+                        except TimeoutException:
+                            # Le bouton "L'entreprise" n'existe pas sur cette offre (c'est normal)
+                            pass
+                        except Exception:
                             pass
 
                         # ========== CONSTRUCTION DE LA ROW FINALE ==========
@@ -404,8 +549,12 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             "description": clean_description(
                                 raw_data.get("description")
                             ),
-                            "job_mission": raw_data.get("job_mission"),
-                            "job_profile": raw_data.get("job_profile"),
+                            "job_mission": clean_description(
+                                raw_data.get("job_mission")
+                            ),
+                            "job_profile": clean_description(
+                                raw_data.get("job_profile")
+                            ),
                         }
 
                         all_data.append(row)
@@ -500,7 +649,7 @@ def run_hw_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["Data Scientist"]
+    keywords_to_test = ["LLM"]
     offers = run_hw_scraper(
         keywords_to_test, max_offres_per_kw=1, save_to_db=False, headless=True
     )
