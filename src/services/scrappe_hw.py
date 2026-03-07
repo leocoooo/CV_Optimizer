@@ -429,9 +429,6 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         # Note: job_profile contient le profil complet, competences reste None
                         raw_data["competences"] = None
 
-                        # ===== AVANTAGES & RÉMUNÉRATION =====
-                        raw_data["benefits"] = None
-
                         # ===== DATE DE PUBLICATION (avant de changer d'onglet) =====
                         raw_data["date_publication"] = None
                         # Note: Laisser à None car l'extraction est inconsistente selon la page
@@ -445,8 +442,6 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
 
                         # ===== ENTREPRISE =====
                         raw_data["company_size"] = None
-                        raw_data["company_sector"] = None
-                        raw_data["company_website"] = None
 
                         # Extraction des données compagnie depuis l'onglet "L'entreprise" (optionnel)
                         try:
@@ -493,23 +488,6 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             except Exception:
                                 pass
 
-                            # Extraction du site web si présent dans la description
-                            try:
-                                company_desc = driver.find_element(
-                                    By.XPATH,
-                                    "//div[contains(@class, 'truncate-text')]//p",
-                                )
-                                desc_text = company_desc.text
-                                website_match = re.search(
-                                    r"(https?://[^\s]+|www\.[^\s]+)", desc_text
-                                )
-                                if website_match:
-                                    raw_data["company_website"] = website_match.group(
-                                        1
-                                    ).rstrip()
-                            except Exception:
-                                pass
-
                         except TimeoutException:
                             # Le bouton "L'entreprise" n'existe pas sur cette offre (c'est normal)
                             pass
@@ -536,15 +514,12 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             # ENTREPRISE
                             "company": raw_data.get("company", "Non spécifié"),
                             "company_size": raw_data.get("company_size"),
-                            "company_sector": raw_data.get("company_sector"),
-                            "company_website": raw_data.get("company_website"),
                             # PROFIL DEMANDÉ
                             "required_experience": raw_data.get("required_experience"),
                             "required_education": raw_data.get("required_education"),
                             "competences": raw_data.get("competences"),
                             # RÉMUNÉRATION & AVANTAGES
                             "salary": raw_data.get("salary"),
-                            "benefits": raw_data.get("benefits"),
                             # CONTENU
                             "description": clean_description(
                                 raw_data.get("description")
@@ -649,7 +624,7 @@ def run_hw_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["LLM"]
+    keywords_to_test = ["Data Scientist"]
     offers = run_hw_scraper(
         keywords_to_test, max_offres_per_kw=1, save_to_db=False, headless=True
     )
