@@ -99,10 +99,15 @@ def clean_description(html_text: str) -> str:
     # 2. Normalisation Unicode (NFC)
     text = unicodedata.normalize("NFC", text)
 
-    # 3. Standardisation des apostrophes
-    text = re.sub(r"[’‘`´]", "'", text)
+    # 3. Suppression des boutons "Voir plus/moins" et "Show more/less"
+    text = re.sub(
+        r"\b(Voir plus|Voir moins|Show more|Show less)\b", "", text, flags=re.IGNORECASE
+    )
 
-    # 4. Suppression des caractères de contrôle
+    # 4. Standardisation des apostrophes
+    text = re.sub(r"[''`´]", "'", text)
+
+    # 5. Suppression des caractères de contrôle
     text = "".join(
         ch for ch in text if unicodedata.category(ch)[0] != "C" or ch in ["\n", "\t"]
     )
@@ -111,7 +116,7 @@ def clean_description(html_text: str) -> str:
     # Le tiret \- est à la fin pour éviter les erreurs d'intervalle
     text = re.sub(r'[^\w\s.,;:()@\'"&#+\-/]', " ", text)
 
-    # 6. Correction du bégaiement (ex: d ' optimiser -> d'optimiser)
+    # 7. Correction du bégaiement (ex: d ' optimiser -> d'optimiser)
     # Supporte désormais tous les accents français
     text = re.sub(
         r"\b([ldnjmtsqLDNJMTSQ])\s*'\s*(?=[aeiouyâêîôûhéèàëïAEIOUYÂÊÎÔÛHÉÈÀËÏ])",
@@ -119,7 +124,7 @@ def clean_description(html_text: str) -> str:
         text,
     )
 
-    # 7. Nettoyage des espaces multiples
+    # 8. Nettoyage des espaces multiples
     text = re.sub(r"\s+", " ", text)
 
     return text.strip()
