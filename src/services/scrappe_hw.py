@@ -495,6 +495,24 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             pass
 
                         # ========== CONSTRUCTION DE LA ROW FINALE ==========
+                        # Merge job_mission into job_profile for unified output
+                        job_profile_text = clean_description(
+                            raw_data.get("job_profile", "")
+                        )
+                        job_mission_text = clean_description(
+                            raw_data.get("job_mission", "")
+                        )
+
+                        # Combine job_profile and job_mission (if both exist)
+                        if job_mission_text and job_profile_text:
+                            combined_profile = (
+                                f"{job_mission_text}\n\n{job_profile_text}"
+                            )
+                        elif job_mission_text:
+                            combined_profile = job_mission_text
+                        else:
+                            combined_profile = job_profile_text
+
                         row = {
                             # IDENTIFIANTS
                             "id": job_id,
@@ -524,12 +542,7 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             "description": clean_description(
                                 raw_data.get("description")
                             ),
-                            "job_mission": clean_description(
-                                raw_data.get("job_mission")
-                            ),
-                            "job_profile": clean_description(
-                                raw_data.get("job_profile")
-                            ),
+                            "job_profile": combined_profile,
                         }
 
                         all_data.append(row)
@@ -626,7 +639,7 @@ if __name__ == "__main__":
     # headless=False permet de voir le navigateur en action
     keywords_to_test = ["Data Scientist"]
     offers = run_hw_scraper(
-        keywords_to_test, max_offres_per_kw=1, save_to_db=False, headless=True
+        keywords_to_test, max_offres_per_kw=3, save_to_db=True, headless=True
     )
 
     print(f"\nRésultat : {len(offers)} offre(s) traité(es)")

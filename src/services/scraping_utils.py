@@ -132,13 +132,21 @@ def clean_description(html_text: str) -> str:
 
 def save_offers_to_db(db_session, offers: list, source_name: str = "Scraping") -> int:
     """
-    Persiste les offres scrapées en base de données.
-    Fonction générique utilisable par tous les scrapers.
+    Persiste les offres scrapées en base de données (NOUVEAU SCHÉMA UNIFIÉ).
+    Fonction générique utilisable par ALL les scrapers (WTTJ, HelloWork, France Travail).
+
+    Gère automatiquement le mapping entre les champs des scrapers et le modèle BD.
+    Tous les champs nouveaux sont maintenant supportés: sector, remote_mode, salary,
+    languages, soft_skills, competences, etc.
+
+    Vérifie automatiquement les doublons avant insertion pour éviter les violations
+    de contraintes d'unicité.
 
     Args:
         db_session: Session SQLAlchemy active
         offers: Liste de dictionnaires contenant les données des offres
-        source_name: Nom de la source pour les logs (ex: "WTTJ", "HelloWork")
+                Peut venir de WTTJ, HelloWork ou France Travail - tous supportés
+        source_name: Nom de la source pour les logs (ex: "WTTJ", "HelloWork", "France Travail")
 
     Returns:
         Nombre d'offres insérées
@@ -147,39 +155,78 @@ def save_offers_to_db(db_session, offers: list, source_name: str = "Scraping") -
         logger.info("Aucune offre à insérer.")
         return 0
 
+    # Vérifier les IDs existants une seule fois au début
+    existing_ids = get_existing_ids(db_session)
     new_offers_count = 0
 
     for offer_data in offers:
         try:
-            # Parse les dates si elles sont en string
-            creation_date = offer_data.get("creation_date")
-            if isinstance(creation_date, str):
-                creation_date = parse_date(creation_date)
+            offer_id = offer_data.get("id")
 
-            actualisation_date = offer_data.get("actualisation_date")
-            if isinstance(actualisation_date, str):
-                actualisation_date = parse_date(actualisation_date)
+            # Vérifier si l'offre existe déjà (doublon)
+            if offer_id in existing_ids:
+                logger.debug(f"Offre {offer_id} déjà en base, ignorée")
+                continue
+
+            # Parse les dates si elles sont en string (support backward-compatibility)
+            date_publication = offer_data.get("date_publication")
+            if isinstance(date_publication, str):
+                date_publication = parse_date(date_publication)
+
+            date_scraping = offer_data.get("date_scraping")
+            if isinstance(date_scraping, str):
+                date_scraping = parse_date(date_scraping)
+
+            # Backward-compatibility: Si date_publication n'existe pas, essayer creation_date
+            if date_publication is None:
+                creation_date = offer_data.get("creation_date")
+                if isinstance(creation_date, str):
+                    date_publication = parse_date(creation_date)
 
             new_offer = JobOffer(
+                # ===== IDs et URLs =====
                 id=offer_data["id"],
-                title=offer_data["title"],
-                company=offer_data["company"],
-                location=offer_data["location"],
-                description=offer_data["description"],
                 url=offer_data["url"],
                 source=offer_data["source"],
-                creation_date=creation_date,
-                actualisation_date=actualisation_date,
+                # ===== DATES =====
+                date_publication=date_publication,
+                date_scraping=date_scraping,
+                # ===== POSTE =====
+                title=offer_data["title"],
+                sector=offer_data.get("sector"),
                 contract_type=offer_data.get("contract_type"),
+                remote_mode=offer_data.get("remote_mode"),
+                # ===== LOCALISATION =====
+                location=offer_data.get("location"),
+                location_address=offer_data.get("location_address"),
+                location_country=offer_data.get("location_country"),
+                # ===== ENTREPRISE =====
+                company=offer_data["company"],
+                company_size=offer_data.get("company_size"),
+                # ===== PROFIL DEMANDÉ =====
                 required_experience=offer_data.get("required_experience"),
-                contact=offer_data.get("contact"),
+                required_education=offer_data.get("required_education"),
+                competences=offer_data.get("competences"),
+                # ===== RÉMUNÉRATION =====
+                salary=offer_data.get("salary"),
+                # ===== CONTENU TEXTUEL =====
+                description=offer_data["description"],
+                job_profile=offer_data.get("job_profile"),
+                # ===== CHAMPS SOURCE-SPÉCIFIQUES =====
+                languages=offer_data.get("languages"),
+                soft_skills=offer_data.get("soft_skills"),
+                nb_positions=offer_data.get("nb_positions"),
+                # ===== CONTENU BRUT =====
                 raw_json=offer_data.get("raw_json"),
             )
             db_session.add(new_offer)
+            existing_ids.add(
+                offer_id
+            )  # Ajouter à la liste pour éviter duplicates dans le même batch
             new_offers_count += 1
         except Exception as e:
             logger.warning(
-                f"Erreur lors de la préparation de l'offre {offer_data.get('title')}: {e}"
+                f"Erreur lors de la préparation de l'offre {offer_data.get('title', 'SANS TITRE')}: {e}"
             )
 
     try:

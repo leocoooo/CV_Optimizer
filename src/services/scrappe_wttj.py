@@ -521,78 +521,41 @@ def scrape_wttj_json_strategy(
                         # "Profil recherché" = job_profile
                         raw_data["job_profile"] = None
                         try:
-                            # Method 1: Find "Profil recherché" heading and get following text section
-                            try:
-                                profile_header = driver.find_element(
-                                    By.XPATH,
-                                    "//h4[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'profil recherch')] | //h3[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'profil recherch')] | //h4[contains(text(), 'Profil')]",
-                                )
+                            # Look for the "Profil recherché" section
+                            # Try different heading levels and get the text content after it
+                            profile_elems = driver.find_elements(
+                                By.XPATH, "//h2 | //h3 | //h4"
+                            )
 
-                                # Get the next div/section container
-                                profile_text = profile_header.find_element(
-                                    By.XPATH,
-                                    "following-sibling::div[1] | following-sibling::p[1]",
-                                )
-
-                                profile_content = profile_text.text.strip()
-                                # Remove trailing "Voir plus" if present
-                                if profile_content.endswith("Voir plus"):
-                                    profile_content = profile_content.replace(
-                                        "Voir plus", ""
-                                    ).strip()
-                                raw_data["job_profile"] = (
-                                    profile_content if profile_content else None
-                                )
-                            except Exception as e:
-                                logger.debug(f"Job profile Method 1 failed: {e}")
-                                pass
-
-                            if not raw_data["job_profile"]:
-                                # Method 2: Look for any heading containing "profil" and get remaining text until next heading
+                            for elem in profile_elems:
                                 try:
-                                    all_content = driver.find_elements(
-                                        By.XPATH,
-                                        "//*[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'profil')]",
-                                    )
-
-                                    if all_content:
-                                        # Get the first heading-like element containing 'profil'
-                                        profile_element = all_content[0]
-                                        # Find the first sibling or child div with content
-                                        profile_container = profile_element.find_element(
+                                    text = elem.text.lower()
+                                    if "profil" in text:
+                                        # Found a heading with "profil"
+                                        # Try to get the sibling div/p/section with content
+                                        following_div = elem.find_element(
                                             By.XPATH,
-                                            "following-sibling::div[1] | following-sibling::p[1]",
+                                            "following-sibling::div[1] | following-sibling::p[1] | following-sibling::section[1]",
                                         )
-                                        content = profile_container.text.strip()
-                                        # Remove trailing "Voir plus" if present
-                                        if content.endswith("Voir plus"):
-                                            content = content.replace(
+                                        profile_content = following_div.text.strip()
+
+                                        # Remove "Voir plus" button text if present
+                                        if profile_content.endswith("Voir plus"):
+                                            profile_content = profile_content.replace(
                                                 "Voir plus", ""
                                             ).strip()
-                                        raw_data["job_profile"] = (
-                                            content if content else None
-                                        )
-                                except Exception as e:
-                                    logger.debug(f"Job profile Method 2 failed: {e}")
-                                    pass
-                        except Exception:
-                            pass
 
-                        # job_mission - try to find "Les missions" section
-                        raw_data["job_mission"] = None
-                        try:
-                            mission_elem = driver.find_element(
-                                By.XPATH,
-                                "//h4[contains(text(), 'Profil recherché')]//following::p[contains(text(), 'Les missions')]/following::ul",
-                            )
-                            mission_items = mission_elem.find_elements(
-                                By.TAG_NAME, "li"
-                            )
-                            if mission_items:
-                                raw_data["job_mission"] = " | ".join(
-                                    [m.text for m in mission_items]
-                                )
+                                        if profile_content:
+                                            raw_data["job_profile"] = profile_content
+                                            break
+                                except Exception:
+                                    # This heading doesn't have the content we need, try next
+                                    continue
+
+                            # If section not found, job_profile remains None (that's OK)
+
                         except Exception:
+                            # job_profile remains None - that's OK, not all offers have this section
                             pass
 
                         # Secteur/Fonction - extract from company info section (data-testid="job-company-tag")
@@ -690,7 +653,6 @@ def scrape_wttj_json_strategy(
                             "description": clean_description(
                                 raw_data.get("description")
                             ),
-                            "job_mission": raw_data.get("job_mission"),
                             "job_profile": clean_description(
                                 raw_data.get("job_profile")
                             ),
@@ -775,9 +737,9 @@ def run_wttj_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["LLM"]
+    keywords_to_test = ["Data Scientist"]
     offers = run_wttj_scraper(
-        keywords_to_test, max_offres_per_kw=1, save_to_db=False, headless=True
+        keywords_to_test, max_offres_per_kw=3, save_to_db=True, headless=True
     )
 
     print(f"\nRésultat : {len(offers)} offre(s) traité(es)")

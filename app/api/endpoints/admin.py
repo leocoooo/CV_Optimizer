@@ -15,7 +15,7 @@ from app.core.exceptions import DatabaseError
 from app.utils import run_in_thread
 
 # Import des services
-from src.services.collector import run_collector
+from src.services.france_travail_collector import run_collector
 from src.services.processor import process_embeddings
 from src.services.scrappe_hw import run_hw_scraper
 from src.services.scrappe_wttj import run_wttj_scraper

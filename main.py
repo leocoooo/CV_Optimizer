@@ -12,7 +12,7 @@ from loguru import logger
 from src.services.cv_reader import CVReader
 from src.services.matcher import JobMatcher
 from src.services.llm_advisor import JobAdvisor
-from src.services.collector import run_collector
+from src.services.france_travail_collector import run_collector
 from src.services.processor import process_embeddings
 from src.services.scrappe_hw import run_hw_scraper
 from src.services.scrappe_wttj import run_wttj_scraper
