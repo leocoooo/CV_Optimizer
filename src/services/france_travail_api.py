@@ -495,7 +495,6 @@ def convert_ft_offer(offer: dict, ft_api: "FranceTravailAPI | None" = None) -> d
         "city": location_details.get("city"),
         "department": location_details.get("department"),
         "region": location_details.get("region"),
-        "location_address": None,
         # ENTREPRISE
         "company": company,
         "company_size": company_size,  # Taille entreprise de FT

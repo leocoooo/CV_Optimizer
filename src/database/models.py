@@ -34,7 +34,6 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     city = Column(String(100), index=True)  # Ville
     department = Column(String(50))  # Département (ex: "Île-de-France")
     region = Column(String(100))  # Région
-    location_address = Column(String(500))  # Adresse complète (optionnel)
 
     # ===== ENTREPRISE =====
     company = Column(String(255), index=True)

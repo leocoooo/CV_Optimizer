@@ -16,6 +16,7 @@ from src.database.database import SessionLocal
 from src.services.scraping_utils import (
     setup_logger,
     get_existing_ids,
+    get_existing_urls,
     clean_description,
     save_offers_to_db,
 )
@@ -30,7 +31,7 @@ CONTRACT_TYPES_WTTJ = {
     "Autres",
     "Freelance",
     "Temps partiel",
-    "Graduate Program",
+    "Graduate program",
     "VIE",
     "Bénévolat / Service Civique",
 }
@@ -99,6 +100,284 @@ PROFESSIONS_AND_SECTORS_WTTJ = PROFESSIONS_WTTJ | SECTORS_WTTJ
 setup_logger(level="DEBUG")
 
 
+def parse_location_wttj(
+    location_address: str | None, driver=None
+) -> dict[str, str | None]:
+    """
+    Parse l'adresse complète de WTTJ au format "Rue, Code Postal Ville, Pays"
+    pour extraire city, department, region.
+
+    Si le parsing d'adresse échoue ou que city reste None, tente de récupérer
+    la ville depuis la balise "lieux de travail" sur la page.
+
+    Exemples:
+        "Pont de Levallois, 92300 Levallois-Perret, France" →
+        {"city": "Levallois-Perret", "department": "Hauts-de-Seine", "region": "Île-de-France"}
+
+    Args:
+        location_address: Adresse complète au format WTTJ
+        driver: WebDriver Selenium (optionnel) pour chercher "lieux de travail" si parsing échoue
+
+    Returns:
+        dict: {"city": str|None, "department": str|None, "region": str|None}
+    """
+    result: dict[str, str | None] = {"city": None, "department": None, "region": None}
+
+    if not location_address and not driver:
+        return result
+
+    # Mappages code postal (2 premiers chiffres = département) → nom
+    dept_names = {
+        "01": "Ain",
+        "02": "Aisne",
+        "03": "Allier",
+        "04": "Alpes-de-Haute-Provence",
+        "05": "Hautes-Alpes",
+        "06": "Alpes-Maritimes",
+        "07": "Ardèche",
+        "08": "Ardennes",
+        "09": "Ariège",
+        "10": "Aube",
+        "11": "Aude",
+        "12": "Aveyron",
+        "13": "Bouches-du-Rhône",
+        "14": "Calvados",
+        "15": "Cantal",
+        "16": "Charente",
+        "17": "Charente-Maritime",
+        "18": "Cher",
+        "19": "Corrèze",
+        "2A": "Corse-du-Sud",
+        "2B": "Haute-Corse",
+        "21": "Côte-d'Or",
+        "22": "Côtes-d'Armor",
+        "23": "Creuse",
+        "24": "Dordogne",
+        "25": "Doubs",
+        "26": "Drôme",
+        "27": "Eure",
+        "28": "Eure-et-Loir",
+        "29": "Finistère",
+        "30": "Gard",
+        "31": "Haute-Garonne",
+        "32": "Gers",
+        "33": "Gironde",
+        "34": "Hérault",
+        "35": "Ille-et-Vilaine",
+        "36": "Indre",
+        "37": "Indre-et-Loire",
+        "38": "Isère",
+        "39": "Jura",
+        "40": "Landes",
+        "41": "Loir-et-Cher",
+        "42": "Loire",
+        "43": "Haute-Loire",
+        "44": "Loire-Atlantique",
+        "45": "Loiret",
+        "46": "Lot",
+        "47": "Lot-et-Garonne",
+        "48": "Lozère",
+        "49": "Maine-et-Loire",
+        "50": "Manche",
+        "51": "Marne",
+        "52": "Haute-Marne",
+        "53": "Mayenne",
+        "54": "Meurthe-et-Moselle",
+        "55": "Meuse",
+        "56": "Morbihan",
+        "57": "Moselle",
+        "58": "Nièvre",
+        "59": "Nord",
+        "60": "Oise",
+        "61": "Orne",
+        "62": "Pas-de-Calais",
+        "63": "Puy-de-Dôme",
+        "64": "Pyrénées-Atlantiques",
+        "65": "Hautes-Pyrénées",
+        "66": "Pyrénées-Orientales",
+        "67": "Bas-Rhin",
+        "68": "Haut-Rhin",
+        "69": "Rhône",
+        "70": "Haute-Saône",
+        "71": "Saône-et-Loire",
+        "72": "Sarthe",
+        "73": "Savoie",
+        "74": "Haute-Savoie",
+        "75": "Paris",
+        "76": "Seine-Maritime",
+        "77": "Seine-et-Marne",
+        "78": "Yvelines",
+        "79": "Deux-Sèvres",
+        "80": "Somme",
+        "81": "Tarn",
+        "82": "Tarn-et-Garonne",
+        "83": "Var",
+        "84": "Vaucluse",
+        "85": "Vendée",
+        "86": "Vienne",
+        "87": "Haute-Vienne",
+        "88": "Vosges",
+        "89": "Yonne",
+        "90": "Territoire de Belfort",
+        "91": "Essonne",
+        "92": "Hauts-de-Seine",
+        "93": "Seine-Saint-Denis",
+        "94": "Val-de-Marne",
+        "95": "Val-d'Oise",
+    }
+
+    # Mappages département → région
+    regions = {
+        "75": "Île-de-France",
+        "77": "Île-de-France",
+        "78": "Île-de-France",
+        "91": "Île-de-France",
+        "92": "Île-de-France",
+        "93": "Île-de-France",
+        "94": "Île-de-France",
+        "95": "Île-de-France",
+        "60": "Île-de-France",
+        "21": "Bourgogne-Franche-Comté",
+        "25": "Bourgogne-Franche-Comté",
+        "39": "Bourgogne-Franche-Comté",
+        "58": "Bourgogne-Franche-Comté",
+        "70": "Bourgogne-Franche-Comté",
+        "71": "Bourgogne-Franche-Comté",
+        "89": "Bourgogne-Franche-Comté",
+        "90": "Bourgogne-Franche-Comté",
+        "22": "Bretagne",
+        "29": "Bretagne",
+        "35": "Bretagne",
+        "56": "Bretagne",
+        "18": "Centre-Val de Loire",
+        "28": "Centre-Val de Loire",
+        "36": "Centre-Val de Loire",
+        "37": "Centre-Val de Loire",
+        "41": "Centre-Val de Loire",
+        "45": "Centre-Val de Loire",
+        "2A": "Corse",
+        "2B": "Corse",
+        "08": "Grand Est",
+        "10": "Grand Est",
+        "51": "Grand Est",
+        "52": "Grand Est",
+        "54": "Grand Est",
+        "55": "Grand Est",
+        "57": "Grand Est",
+        "67": "Grand Est",
+        "68": "Grand Est",
+        "88": "Grand Est",
+        "02": "Hauts-de-France",
+        "59": "Hauts-de-France",
+        "62": "Hauts-de-France",
+        "80": "Hauts-de-France",
+        "14": "Normandie",
+        "27": "Normandie",
+        "50": "Normandie",
+        "61": "Normandie",
+        "76": "Normandie",
+        "16": "Nouvelle-Aquitaine",
+        "17": "Nouvelle-Aquitaine",
+        "19": "Nouvelle-Aquitaine",
+        "23": "Nouvelle-Aquitaine",
+        "24": "Nouvelle-Aquitaine",
+        "33": "Nouvelle-Aquitaine",
+        "40": "Nouvelle-Aquitaine",
+        "47": "Nouvelle-Aquitaine",
+        "64": "Nouvelle-Aquitaine",
+        "79": "Nouvelle-Aquitaine",
+        "86": "Nouvelle-Aquitaine",
+        "87": "Nouvelle-Aquitaine",
+        "09": "Occitanie",
+        "11": "Occitanie",
+        "12": "Occitanie",
+        "30": "Occitanie",
+        "31": "Occitanie",
+        "32": "Occitanie",
+        "34": "Occitanie",
+        "46": "Occitanie",
+        "48": "Occitanie",
+        "65": "Occitanie",
+        "66": "Occitanie",
+        "81": "Occitanie",
+        "82": "Occitanie",
+        "01": "Auvergne-Rhône-Alpes",
+        "03": "Auvergne-Rhône-Alpes",
+        "07": "Auvergne-Rhône-Alpes",
+        "15": "Auvergne-Rhône-Alpes",
+        "26": "Auvergne-Rhône-Alpes",
+        "38": "Auvergne-Rhône-Alpes",
+        "42": "Auvergne-Rhône-Alpes",
+        "43": "Auvergne-Rhône-Alpes",
+        "63": "Auvergne-Rhône-Alpes",
+        "69": "Auvergne-Rhône-Alpes",
+        "73": "Auvergne-Rhône-Alpes",
+        "74": "Auvergne-Rhône-Alpes",
+        "04": "Provence-Alpes-Côte d'Azur",
+        "05": "Provence-Alpes-Côte d'Azur",
+        "06": "Provence-Alpes-Côte d'Azur",
+        "13": "Provence-Alpes-Côte d'Azur",
+        "83": "Provence-Alpes-Côte d'Azur",
+        "84": "Provence-Alpes-Côte d'Azur",
+        "44": "Pays de la Loire",
+        "49": "Pays de la Loire",
+        "53": "Pays de la Loire",
+        "72": "Pays de la Loire",
+        "85": "Pays de la Loire",
+    }
+
+    # ÉTAPE 1: Essayer de parser l'adresse au format "Rue, Code Postal Ville, Pays"
+    if location_address:
+        try:
+            postal_match = re.search(r"\b(\d{5})\b", location_address)
+            if postal_match:
+                postal_code = postal_match.group(1)
+                dept_code = postal_code[:2]
+
+                city_match = re.search(r"\d{5}\s+([^,]+)", location_address)
+                if city_match:
+                    result["city"] = city_match.group(1).strip()
+                    result["department"] = dept_names.get(dept_code)
+                    result["region"] = regions.get(dept_code)
+                    return result  # Succès - on retourne
+        except Exception as e:
+            logger.debug(f"Erreur parsing address WTTJ: {e}")
+
+    # ÉTAPE 2: Si le parsing a échoué ou pas d'adresse, chercher dans "lieux de travail" sur la page
+    if driver and not result["city"]:
+        try:
+            workplace_elem = driver.find_element(
+                By.XPATH,
+                "//span[contains(text(), 'Lieux de travail')] | //label[contains(text(), 'Lieux de travail')] | //div[contains(text(), 'Lieux de travail')]",
+            )
+            # Chercher le texte qui suit - généralement dans le même parent ou suivant
+            parent = workplace_elem.find_element(By.XPATH, "ancestor::div[1]")
+            workplace_text = parent.text.strip()
+
+            # Extraire la ville (première ligne de texte après "Lieux de travail")
+            lines = workplace_text.split("\n")
+            if len(lines) > 1:
+                city_candidate = lines[1].strip()  # Deuxième ligne généralement
+                if city_candidate and not any(
+                    kw in city_candidate
+                    for kw in ["Lieux", "travail", "de", "télétravail"]
+                ):
+                    result["city"] = city_candidate
+                    logger.debug(f"City from workplace section: {result['city']}")
+
+                    # Essayer d'extraire le code postal si présent
+                    postal_match = re.search(r"\b(\d{5})\b", workplace_text)
+                    if postal_match:
+                        postal_code = postal_match.group(1)
+                        dept_code = postal_code[:2]
+                        result["department"] = dept_names.get(dept_code)
+                        result["region"] = regions.get(dept_code)
+        except Exception as e:
+            logger.debug(f"Erreur recherche 'lieux de travail': {e}")
+
+    return result
+
+
 def scrape_wttj_json_strategy(
     keywords, max_offres_per_kw=1, db_session=None, headless=None
 ):
@@ -112,8 +391,9 @@ def scrape_wttj_json_strategy(
 
     driver = webdriver.Chrome(service=service, options=options)
 
-    # Récupération des IDs déjà scrapés (en base + run actuel)
+    # Récupération des IDs et URLs déjà scrapés (en base + run actuel)
     existing_ids = get_existing_ids(db_session) if db_session else set()
+    existing_urls = get_existing_urls(db_session) if db_session else set()
     all_data = []
 
     try:
@@ -226,14 +506,7 @@ def scrape_wttj_json_strategy(
                         raw_data["company_size"] = hiring_org.get("numberOfEmployees")
 
                         # ===== LOCALISATION =====
-                        location = (
-                            job_data.get("jobLocation", [{}])[0]
-                            .get("address", {})
-                            .get("addressLocality", "N/C")
-                        )
-                        raw_data["location"] = location
-
-                        # Adresse complète si disponible
+                        # Récupérer l'adresse complète depuis le JSON-LD pour parsing robuste
                         location_obj = job_data.get("jobLocation", [{}])[0].get(
                             "address", {}
                         )
@@ -246,9 +519,6 @@ def scrape_wttj_json_strategy(
                                 location_obj.get("addressCountry"),
                             ]
                             location_address = ", ".join(p for p in address_parts if p)
-                        raw_data["location_address"] = (
-                            location_address if location_address else None
-                        )
 
                         # ===== CONTRAT & CONDITIONS =====
                         # Extract contract type from page HTML
@@ -425,72 +695,31 @@ def scrape_wttj_json_strategy(
                             logger.debug(f"Competences extraction failed: {e}")
 
                         # ===== RÉMUNÉRATION & AVANTAGES =====
+                        # Prendre le salaire SEULEMENT s'il y a un tag "Salaire :"
                         raw_data["salary"] = None
                         try:
-                            # Find salary in metadata - look for the pattern near "Salaire"
-                            salary_found = False
+                            # Chercher un élément contenant "Salaire :" directement sur la page
+                            salary_tag = driver.find_element(
+                                By.XPATH,
+                                "//span[contains(text(), 'Salaire :')] | //div[contains(text(), 'Salaire :')] | //label[contains(text(), 'Salaire :')]",
+                            )
+                            # Si on trouve le tag, récupérer le texte du parent ou du suivant
                             try:
-                                # Method 1: Find "Salaire :" text and extract adjacent content
-                                all_content = driver.page_source
-                                # Search for salary pattern in page source (handles &nbsp; entities)
-                                salary_match = re.search(
-                                    r"Salaire\s*:\s*([\d]+[KM]?\s*€)",
-                                    all_content,
-                                    re.IGNORECASE,
+                                # Chercher du texte avec € à proximité
+                                parent = salary_tag.find_element(
+                                    By.XPATH,
+                                    "ancestor::div[1] | parent::div | parent::span",
                                 )
-                                if salary_match:
-                                    raw_data["salary"] = salary_match.group(1).strip()
-                                    salary_found = True
-                                    logger.debug(
-                                        f"Salary found via regex: {raw_data['salary']}"
-                                    )
+                                salary_text = parent.text.strip()
+                                match = re.search(r"([\d\s]+[KM]?\s*€)", salary_text)
+                                if match:
+                                    raw_data["salary"] = match.group(1).strip()
+                                    logger.debug(f"Salary found: {raw_data['salary']}")
                             except Exception:
                                 pass
-
-                            if not salary_found:
-                                # Method 2: Find elements containing salary icon and get text
-                                try:
-                                    salary_spans = driver.find_elements(
-                                        By.XPATH,
-                                        "//span[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'salaire')]",
-                                    )
-                                    for span in salary_spans:
-                                        try:
-                                            parent = span.find_element(
-                                                By.XPATH, "parent::div | parent::span"
-                                            )
-                                            parent_text = parent.text.strip()
-                                            match = re.search(
-                                                r"([\d]+[KM]?\s*€)", parent_text
-                                            )
-                                            if match:
-                                                raw_data["salary"] = match.group(
-                                                    1
-                                                ).strip()
-                                                salary_found = True
-                                                break
-                                        except Exception:
-                                            pass
-                                except Exception:
-                                    pass
-
-                            if not salary_found:
-                                # Method 3: Look for € in page and find the shortest digit pattern
-                                try:
-                                    salary_pattern = re.search(
-                                        r"([\d]+[KM]?\s*€)", driver.page_source
-                                    )
-                                    if salary_pattern:
-                                        raw_data["salary"] = salary_pattern.group(
-                                            1
-                                        ).strip()
-                                        logger.debug(
-                                            f"Salary found via pattern: {raw_data['salary']}"
-                                        )
-                                except Exception:
-                                    pass
-                        except Exception as e:
-                            logger.debug(f"Salary extraction failed: {e}")
+                        except Exception:
+                            # Pas de tag "Salaire :" trouvé - laisser à None
+                            pass
 
                         # ===== CONTENU & DESCRIPTIONS =====
                         # "Le poste" = description
@@ -568,13 +797,17 @@ def scrape_wttj_json_strategy(
                                 try:
                                     sector_text = tag_span.text.strip()
                                     if sector_text and len(sector_text) > 2:
-                                        # Filter generic terms and company info (e.g., "400 collaborateurs")
+                                        # Filter generic terms, company info, and percentages
                                         exclude_keywords = [
                                             "collaborateurs",
                                             "Créée en",
                                             "Âge moyen",
                                             "Chiffre d'affaires",
                                         ]
+                                        # Skip if it's a percentage (e.g., "45%", "55%")
+                                        if re.match(r"^\d+%$", sector_text):
+                                            continue
+                                        # Skip if contains excluded keywords
                                         if not any(
                                             kw.lower() in sector_text.lower()
                                             for kw in exclude_keywords
@@ -607,16 +840,24 @@ def scrape_wttj_json_strategy(
                         # Ensure company, title, location are strings before processing
                         company_str = str(company).lower() if company else "inconnu"
                         title_str = str(title).lower() if title else "sans_titre"
-                        location_str = str(location).lower() if location else "n_a"
+                        location_str = (
+                            str(location_address).lower() if location_address else "n_a"
+                        )
 
                         job_id = hashlib.sha256(
                             f"{company_str}|{title_str}|{location_str}".encode()
                         ).hexdigest()
 
-                        # Vérification doublons AVANT extraction compl des détails
-                        if job_id in existing_ids:
+                        # Vérification doublons AVANT extraction complète des détails
+                        # Check both by ID and by URL to catch duplicates even if location_address changed
+                        if job_id in existing_ids or link in existing_urls:
                             logger.debug(f"Skipping : {title} (Déjà en base)")
                             continue
+
+                        # Parse location to extract city, department, region (avec fallback à "lieux de travail")
+                        location_parsed = parse_location_wttj(
+                            location_address, driver=driver
+                        )
 
                         # ========== CONSTRUCTION DE LA ROW FINALE ==========
                         row = {
@@ -632,8 +873,9 @@ def scrape_wttj_json_strategy(
                             "contract_type": raw_data.get("contract_type"),
                             "remote_mode": raw_data.get("remote_mode"),
                             # LOCALISATION
-                            "location": location,
-                            "location_address": raw_data.get("location_address"),
+                            "city": location_parsed.get("city"),
+                            "department": location_parsed.get("department"),
+                            "region": location_parsed.get("region"),
                             # ENTREPRISE
                             "company": company,
                             "company_size": raw_data.get("company_size"),
@@ -654,6 +896,7 @@ def scrape_wttj_json_strategy(
 
                         all_data.append(row)
                         existing_ids.add(job_id)
+                        existing_urls.add(link)
                         logger.info(
                             f"[{count_for_kw + 1}/{max_offres_per_kw}] Scrapé : {title}"
                         )

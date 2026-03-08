@@ -17,6 +17,7 @@ from src.services.scraping_utils import (
     get_existing_ids,
     clean_description,
     save_offers_to_db,
+    parse_location_hellowork,
 )
 
 # Configuration du logger
@@ -260,12 +261,17 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             raw_data["title"] = "Sans titre"
 
                         # Entreprise
+                        raw_data["company"] = "Non spécifié"
                         try:
-                            raw_data["company"] = driver.find_element(
-                                By.CSS_SELECTOR, "p.tw-typo-s.tw-inline"
-                            ).text
-                        except Exception:
-                            raw_data["company"] = "Non spécifié"
+                            # L'entreprise est dans un <a> tag qui est dans le même <h1> que le titre
+                            # Chercher : <h1 id="main-content"> → <a> (deuxième enfant span contenant l'a)
+                            company_link = driver.find_element(
+                                By.XPATH,
+                                "//h1[@id='main-content']//a[contains(@href, '/entreprises/')]",
+                            )
+                            raw_data["company"] = company_link.text.strip()
+                        except Exception as e:
+                            logger.debug(f"Erreur extraction company: {e}")
 
                         # Extraction des tags (contrat, expérience, localisation, éducation, secteur, télétravail)
                         raw_data["contract_type"] = None
@@ -347,11 +353,6 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             elif raw_data["location"] is None:
                                 raw_data["location"] = tag
 
-                        # ===== LOCALISATION =====
-                        raw_data["location_address"] = (
-                            None  # Non disponible sur HelloWork
-                        )
-
                         # ===== CONTENU (AVANT de changer d'onglet) =====
                         # Description principale - EXTRAIRE AVANT de cliquer sur L'entreprise
                         description_text = ""
@@ -428,9 +429,28 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         # Note: job_profile contient le profil complet, competences reste None
                         raw_data["competences"] = None
 
-                        # ===== DATE DE PUBLICATION (avant de changer d'onglet) =====
+                        # ===== DATE DE PUBLICATION =====
                         raw_data["date_publication"] = None
-                        # Note: Laisser à None car l'extraction est inconsistente selon la page
+                        try:
+                            # Chercher le span contenant "Publiée le JJ/MM/YYYY"
+                            date_span = driver.find_element(
+                                By.XPATH,
+                                "//span[contains(@class, 'tw-typo-xs') and contains(text(), 'Publiée le')]",
+                            )
+                            date_text = date_span.text.strip()
+                            # Exemple: "Publiée le 06/03/2026 - Réf : 3863559/27848310 DSF/44N"
+                            match = re.search(
+                                r"Publiée le (\d{2}/\d{2}/\d{4})", date_text
+                            )
+                            if match:
+                                date_str = match.group(1)  # "06/03/2026"
+                                # Convertir JJ/MM/YYYY en ISO format YYYY-MM-DDTHH:MM:SSZ
+                                date_obj = datetime.strptime(date_str, "%d/%m/%Y")
+                                raw_data["date_publication"] = (
+                                    date_obj.isoformat() + "Z"
+                                )
+                        except Exception as e:
+                            logger.debug(f"Erreur extraction date publication: {e}")
 
                         # ===== CONVERSION DES LISTES EN STRINGS =====
                         # Convertir la liste de secteurs/fonctions en string avec séparateur
@@ -512,6 +532,11 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         else:
                             combined_profile = job_profile_text
 
+                        # Parse location format "Ville - Code" to extract city, department, region
+                        location_parsed = parse_location_hellowork(
+                            raw_data.get("location")
+                        )
+
                         row = {
                             # IDENTIFIANTS
                             "id": job_id,
@@ -525,8 +550,9 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             "contract_type": raw_data.get("contract_type"),
                             "remote_mode": raw_data.get("remote_mode"),
                             # LOCALISATION
-                            "location": raw_data.get("location"),
-                            "location_address": raw_data.get("location_address"),
+                            "city": location_parsed.get("city"),
+                            "department": location_parsed.get("department"),
+                            "region": location_parsed.get("region"),
                             # ENTREPRISE
                             "company": raw_data.get("company", "Non spécifié"),
                             "company_size": raw_data.get("company_size"),
@@ -637,7 +663,7 @@ if __name__ == "__main__":
     # headless=False permet de voir le navigateur en action
     keywords_to_test = ["Data Scientist"]
     offers = run_hw_scraper(
-        keywords_to_test, max_offres_per_kw=3, save_to_db=True, headless=True
+        keywords_to_test, max_offres_per_kw=1, save_to_db=True, headless=False
     )
 
     print(f"\nRésultat : {len(offers)} offre(s) traité(es)")
