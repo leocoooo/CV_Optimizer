@@ -72,7 +72,7 @@ def run_collector(keywords_to_fetch, max_offers=50):
                     if count_for_kw >= max_offers:
                         break
 
-                    converted_offer = convert_ft_offer(raw_offer)
+                    converted_offer = convert_ft_offer(raw_offer, api)
                     offer_id = converted_offer.get("id")
 
                     # Vérifier si c'est un doublon
@@ -113,5 +113,5 @@ def run_collector(keywords_to_fetch, max_offers=50):
 
 
 if __name__ == "__main__":
-    keywords_to_fetch = ["Data Scientist"]
+    keywords_to_fetch = ["Data Engineer", "Data Scientist", "Data Analyst"]
     run_collector(keywords_to_fetch, 3)

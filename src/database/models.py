@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, Integer, func
+from sqlalchemy import Column, String, Text, DateTime, func
 from pgvector.sqlalchemy import Vector
 from src.database.database import Base
 
@@ -31,15 +31,16 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     remote_mode = Column(String(100))  # Télétravail total, occasionnel, etc.
 
     # ===== LOCALISATION =====
-    location = Column(String(100), index=True)  # Ville/lieu principal
+    city = Column(String(100), index=True)  # Ville
+    department = Column(String(50))  # Département (ex: "Île-de-France")
+    region = Column(String(100))  # Région
     location_address = Column(String(500))  # Adresse complète (optionnel)
-    location_country = Column(String(10))  # Code pays (optionnel)
 
     # ===== ENTREPRISE =====
     company = Column(String(255), index=True)
     company_size = Column(
-        String(100)
-    )  # "22000 collaborateurs", "20 à 49 salariés", etc.
+        String(500)
+    )  # "22000 collaborateurs", "0 salarié (n'ayant pas d'effectif au 31/12...)", etc.
 
     # ===== PROFIL DEMANDÉ =====
     required_experience = Column(String(255))  # "< 6 mois", "5 ans", etc.
@@ -47,7 +48,9 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     competences = Column(Text)  # Comma-separated skills list
 
     # ===== RÉMUNÉRATION =====
-    salary = Column(String(100))  # "20K €", "Annuel de 40000 Euros", etc.
+    salary = Column(
+        String(255)
+    )  # "20K €", "Annuel de 40000 Euros", "Mensuel de 810.0 Euros à 1801.0 Euros sur 12.0 mois", etc.
 
     # ===== CONTENU TEXTUEL =====
     description = Column(Text, nullable=False)  # Description complète du poste
@@ -56,12 +59,6 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     # ===== CHAMPS SOURCE-SPÉCIFIQUES =====
     languages = Column(String(255))  # France Travail: "Anglais, Français"
     soft_skills = Column(Text)  # France Travail: "Esprit d'équipe, Rigueur"
-    nb_positions = Column(Integer)  # France Travail: nombre de postes
-
-    # ===== CONTENU BRUT =====
-    raw_json = Column(
-        Text
-    )  # JSON brut de l'offre pour conserver toutes les infos originales
 
     # ===== VECTEUR D'EMBEDDING =====
     # 384 dimensions pour le modèle all-MiniLM-L6-v2

@@ -351,7 +351,6 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         raw_data["location_address"] = (
                             None  # Non disponible sur HelloWork
                         )
-                        raw_data["location_country"] = "France"
 
                         # ===== CONTENU (AVANT de changer d'onglet) =====
                         # Description principale - EXTRAIRE AVANT de cliquer sur L'entreprise
@@ -528,7 +527,6 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             # LOCALISATION
                             "location": raw_data.get("location"),
                             "location_address": raw_data.get("location_address"),
-                            "location_country": raw_data.get("location_country"),
                             # ENTREPRISE
                             "company": raw_data.get("company", "Non spécifié"),
                             "company_size": raw_data.get("company_size"),

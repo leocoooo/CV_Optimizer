@@ -18,7 +18,7 @@ def parse_date(date_str: str):
     Parse une date depuis différents formats possibles.
 
     Args:
-        date_str: Date en string (ex: "22/12/2025", "2025-12-22T10:30:00Z")
+        date_str: Date en string (ex: "22/12/2025", "2025-12-22T10:30:00Z", "2026-03-06T09:25:56.076Z")
 
     Returns:
         datetime object ou None si parsing échoue
@@ -26,10 +26,12 @@ def parse_date(date_str: str):
     if not date_str:
         return None
 
-    # Liste des formats possibles
+    # Liste des formats possibles (ordre de priorité: plus spécifique en premier)
     formats = [
-        "%d/%m/%Y",  # HelloWork: 22/12/2025
+        "%Y-%m-%dT%H:%M:%S.%fZ",  # France Travail ISO: 2026-03-06T09:25:56.076Z
+        "%Y-%m-%dT%H:%M:%S.%f",  # ISO avec millisecondes (Python isoformat): 2026-03-08T14:37:41.628093
         "%Y-%m-%dT%H:%M:%SZ",  # WTTJ ISO: 2025-12-22T10:30:00Z
+        "%d/%m/%Y",  # HelloWork: 22/12/2025
         "%Y-%m-%d",  # Simple: 2025-12-22
         "%d-%m-%Y",  # Alternatif: 22-12-2025
     ]
@@ -197,9 +199,13 @@ def save_offers_to_db(db_session, offers: list, source_name: str = "Scraping") -
                 contract_type=offer_data.get("contract_type"),
                 remote_mode=offer_data.get("remote_mode"),
                 # ===== LOCALISATION =====
-                location=offer_data.get("location"),
+                city=offer_data.get("city")
+                or offer_data.get(
+                    "location"
+                ),  # Fallback to location for backward compatibility
+                department=offer_data.get("department"),
+                region=offer_data.get("region"),
                 location_address=offer_data.get("location_address"),
-                location_country=offer_data.get("location_country"),
                 # ===== ENTREPRISE =====
                 company=offer_data["company"],
                 company_size=offer_data.get("company_size"),
@@ -215,9 +221,6 @@ def save_offers_to_db(db_session, offers: list, source_name: str = "Scraping") -
                 # ===== CHAMPS SOURCE-SPÉCIFIQUES =====
                 languages=offer_data.get("languages"),
                 soft_skills=offer_data.get("soft_skills"),
-                nb_positions=offer_data.get("nb_positions"),
-                # ===== CONTENU BRUT =====
-                raw_json=offer_data.get("raw_json"),
             )
             db_session.add(new_offer)
             existing_ids.add(

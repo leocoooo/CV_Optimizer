@@ -249,11 +249,6 @@ def scrape_wttj_json_strategy(
                         raw_data["location_address"] = (
                             location_address if location_address else None
                         )
-                        raw_data["location_country"] = (
-                            job_data.get("jobLocation", [{}])[0]
-                            .get("address", {})
-                            .get("addressCountry", "France")
-                        )
 
                         # ===== CONTRAT & CONDITIONS =====
                         # Extract contract type from page HTML
@@ -639,7 +634,6 @@ def scrape_wttj_json_strategy(
                             # LOCALISATION
                             "location": location,
                             "location_address": raw_data.get("location_address"),
-                            "location_country": raw_data.get("location_country"),
                             # ENTREPRISE
                             "company": company,
                             "company_size": raw_data.get("company_size"),
