@@ -29,6 +29,9 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     sector = Column(String(255))  # Secteur d'activité
     contract_type = Column(String(100))  # CDI, CDD, Stage, Alternance, etc.
     remote_mode = Column(String(100))  # Télétravail total, occasionnel, etc.
+    salary = Column(
+        String(255)
+    )  # "20K €", "Annuel de 40000 Euros", "Mensuel de 810.0 Euros à 1801.0 Euros sur 12.0 mois", etc.
 
     # ===== LOCALISATION =====
     city = Column(String(100), index=True)  # Ville
@@ -45,19 +48,12 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     required_experience = Column(String(255))  # "< 6 mois", "5 ans", etc.
     required_education = Column(String(255))  # "Bac +5 / Master", "Bac +3", etc.
     competences = Column(Text)  # Comma-separated skills list
-
-    # ===== RÉMUNÉRATION =====
-    salary = Column(
-        String(255)
-    )  # "20K €", "Annuel de 40000 Euros", "Mensuel de 810.0 Euros à 1801.0 Euros sur 12.0 mois", etc.
+    soft_skills = Column(Text)  # France Travail: "Esprit d'équipe, Rigueur"
+    languages = Column(String(255))  # France Travail: "Anglais, Français"
 
     # ===== CONTENU TEXTUEL =====
     description = Column(Text, nullable=False)  # Description complète du poste
     job_profile = Column(Text)  # Profil demandé / Qualifications
-
-    # ===== CHAMPS SOURCE-SPÉCIFIQUES =====
-    languages = Column(String(255))  # France Travail: "Anglais, Français"
-    soft_skills = Column(Text)  # France Travail: "Esprit d'équipe, Rigueur"
 
     # ===== VECTEUR D'EMBEDDING =====
     # 384 dimensions pour le modèle all-MiniLM-L6-v2

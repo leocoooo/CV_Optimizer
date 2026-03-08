@@ -661,9 +661,9 @@ def run_hw_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["Data Scientist"]
+    keywords_to_test = ["Data Scientist", "Data Engineer", "Data Analyst"]
     offers = run_hw_scraper(
-        keywords_to_test, max_offres_per_kw=1, save_to_db=True, headless=False
+        keywords_to_test, max_offres_per_kw=3, save_to_db=True, headless=True
     )
 
     print(f"\nRésultat : {len(offers)} offre(s) traité(es)")
