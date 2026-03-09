@@ -432,25 +432,50 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         # ===== DATE DE PUBLICATION =====
                         raw_data["date_publication"] = None
                         try:
-                            # Chercher le span contenant "Publiée le JJ/MM/YYYY"
-                            date_span = driver.find_element(
-                                By.XPATH,
-                                "//span[contains(@class, 'tw-typo-xs') and contains(text(), 'Publiée le')]",
+                            # Attendre que le span contenant "Publiée le" soit présent
+                            wait = WebDriverWait(driver, 5)
+                            date_span = wait.until(
+                                EC.presence_of_element_located(
+                                    (By.XPATH, "//span[contains(., 'Publiée le')]")
+                                )
                             )
-                            date_text = date_span.text.strip()
-                            # Exemple: "Publiée le 06/03/2026 - Réf : 3863559/27848310 DSF/44N"
+
+                            # Scroller vers l'élément pour s'assurer qu'il est visible
+                            driver.execute_script(
+                                "arguments[0].scrollIntoView(true);", date_span
+                            )
+                            time.sleep(0.3)
+
+                            # Récupérer le texte - essayer d'abord .text, puis textContent
+                            date_text = (
+                                date_span.text.strip()
+                                or date_span.get_attribute("textContent").strip()
+                            )
+                            logger.debug(f"Date found: '{date_text}'")
+
+                            # Parser: "Publiée le 08/03/2026 - Réf : Data Analyst (H/F)"
                             match = re.search(
                                 r"Publiée le (\d{2}/\d{2}/\d{4})", date_text
                             )
                             if match:
-                                date_str = match.group(1)  # "06/03/2026"
-                                # Convertir JJ/MM/YYYY en ISO format YYYY-MM-DDTHH:MM:SSZ
+                                date_str = match.group(1)  # "08/03/2026"
                                 date_obj = datetime.strptime(date_str, "%d/%m/%Y")
                                 raw_data["date_publication"] = (
                                     date_obj.isoformat() + "Z"
                                 )
+                                logger.debug(
+                                    f"Date parsed: {raw_data['date_publication']}"
+                                )
+                            else:
+                                logger.debug(
+                                    f"Regex didn't match date text: '{date_text}'"
+                                )
+                        except TimeoutException:
+                            logger.debug("Timeout waiting for date span")
                         except Exception as e:
-                            logger.debug(f"Erreur extraction date publication: {e}")
+                            logger.debug(
+                                f"Erreur extraction date publication: {type(e).__name__}: {e}"
+                            )
 
                         # ===== CONVERSION DES LISTES EN STRINGS =====
                         # Convertir la liste de secteurs/fonctions en string avec séparateur

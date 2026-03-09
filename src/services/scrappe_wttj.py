@@ -126,6 +126,57 @@ def parse_location_wttj(
     if not location_address and not driver:
         return result
 
+    # Mapping explicite des principales villes → département (pour fallback sans code postal)
+    city_to_dept = {
+        "Paris": "75",
+        "Lyon": "69",
+        "Marseille": "13",
+        "Toulouse": "31",
+        "Nice": "06",
+        "Nantes": "44",
+        "Strasbourg": "67",
+        "Montpellier": "34",
+        "Bordeaux": "33",
+        "Lille": "59",
+        "Rennes": "35",
+        "Reims": "51",
+        "Le Havre": "76",
+        "Saint-Étienne": "42",
+        "Toulon": "83",
+        "Grenoble": "38",
+        "Angers": "49",
+        "Dijon": "21",
+        "Nîmes": "30",
+        "Clermont-Ferrand": "63",
+        "Brest": "29",
+        "Limoges": "87",
+        "Tours": "37",
+        "Amiens": "80",
+        "Metz": "57",
+        "Perpignan": "66",
+        "Besançon": "25",
+        "Orléans": "45",
+        "Rouen": "76",
+        "Caen": "14",
+        "Nancy": "54",
+        "Villeurbanne": "69",
+        "Boulogne-Billancourt": "92",
+        "Montreuil": "93",
+        "Montrouge": "92",
+        "Saint-Denis": "93",
+        "Levallois-Perret": "92",
+        "Issy-les-Moulineaux": "92",
+        "Neuilly-sur-Seine": "92",
+        "Courbevoie": "92",
+        "Vanves": "92",
+        "Malakoff": "92",
+        "Clamart": "92",
+        "Saint-Ouen": "93",
+        "Bagnolet": "93",
+        "Pantin": "93",
+        "Bobigny": "93",
+    }
+
     # Mappages code postal (2 premiers chiffres = département) → nom
     dept_names = {
         "01": "Ain",
@@ -346,32 +397,74 @@ def parse_location_wttj(
     # ÉTAPE 2: Si le parsing a échoué ou pas d'adresse, chercher dans "lieux de travail" sur la page
     if driver and not result["city"]:
         try:
-            workplace_elem = driver.find_element(
-                By.XPATH,
-                "//span[contains(text(), 'Lieux de travail')] | //label[contains(text(), 'Lieux de travail')] | //div[contains(text(), 'Lieux de travail')]",
-            )
-            # Chercher le texte qui suit - généralement dans le même parent ou suivant
-            parent = workplace_elem.find_element(By.XPATH, "ancestor::div[1]")
-            workplace_text = parent.text.strip()
+            # Chercher l'en-tête "Le lieu de travail" ou "Lieux de travail" (les deux variations)
+            heading_xpath = "//h4[contains(., 'lieu de travail')] | //h4[contains(., 'Lieux de travail')]"
+            heading_elems = driver.find_elements(By.XPATH, heading_xpath)
 
-            # Extraire la ville (première ligne de texte après "Lieux de travail")
-            lines = workplace_text.split("\n")
-            if len(lines) > 1:
-                city_candidate = lines[1].strip()  # Deuxième ligne généralement
-                if city_candidate and not any(
-                    kw in city_candidate
-                    for kw in ["Lieux", "travail", "de", "télétravail"]
-                ):
-                    result["city"] = city_candidate
-                    logger.debug(f"City from workplace section: {result['city']}")
+            if heading_elems:
+                # Le heading trouvé, chercher le lien avec la localisation qui le suit
+                # Structure: h4 → parent div → sibling a (avec la location)
+                heading = heading_elems[0]
+                parent_div = heading.find_element(By.XPATH, "ancestor::div[1]")
 
-                    # Essayer d'extraire le code postal si présent
-                    postal_match = re.search(r"\b(\d{5})\b", workplace_text)
-                    if postal_match:
-                        postal_code = postal_match.group(1)
-                        dept_code = postal_code[:2]
-                        result["department"] = dept_names.get(dept_code)
-                        result["region"] = regions.get(dept_code)
+                # Chercher le lien 'a' dans ce div (ou dans un div suivant)
+                location_links = parent_div.find_elements(
+                    By.XPATH, ".//a[@href and contains(@href, 'maps')]"
+                )
+
+                if location_links:
+                    location_link = location_links[0]
+                    # Extraire le texte du lien (qui contient la location)
+                    location_text = location_link.text.strip()
+
+                    if location_text:
+                        logger.debug(f"Location text from page: {location_text}")
+
+                        # Chercher le code postal (5 chiffres) - FORMAT 1: "75009, Paris, ..."
+                        postal_match = re.search(r"\b(\d{5})\b", location_text)
+                        if postal_match:
+                            postal_code = postal_match.group(1)
+                            dept_code = postal_code[:2]
+
+                            # Extraire la ville (après le code postal)
+                            city_match = re.search(r"\d{5}\s+([^,]+)", location_text)
+                            if city_match:
+                                result["city"] = city_match.group(1).strip()
+                                result["department"] = dept_names.get(dept_code)
+                                result["region"] = regions.get(dept_code)
+                                logger.debug(
+                                    f"Extracted from workplace page (with postal): city={result['city']}, dept={result['department']}, region={result['region']}"
+                                )
+                        else:
+                            # FORMAT 2: Sans code postal - "Toulouse, Occitanie, France"
+                            # Extraire ville et région directement
+                            parts = [p.strip() for p in location_text.split(",")]
+                            if len(parts) >= 2:
+                                result["city"] = parts[0]
+                                result["region"] = parts[1]
+                                logger.debug(
+                                    f"Extracted from workplace page (without postal): city={result['city']}, region={result['region']}"
+                                )
+
+                                # Chercher le département : d'abord par un mapping explicite ville→dept
+                                if result["city"] in city_to_dept:
+                                    dept_code = city_to_dept[result["city"]]
+                                    result["department"] = dept_names.get(dept_code)
+                                    logger.debug(
+                                        f"Matched department (from city mapping): {result['department']} for {result['city']}"
+                                    )
+                                else:
+                                    # Sinon, prendre le premier département de la région
+                                    # (moins fiable mais mieux que rien)
+                                    for dept_code, region_name in regions.items():
+                                        if region_name == result["region"]:
+                                            result["department"] = dept_names.get(
+                                                dept_code
+                                            )
+                                            logger.debug(
+                                                f"Matched department (from region fallback): {result['department']} (from region {result['region']})"
+                                            )
+                                            break
         except Exception as e:
             logger.debug(f"Erreur recherche 'lieux de travail': {e}")
 
@@ -974,9 +1067,9 @@ def run_wttj_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["Data Scientist", "Data Engineer", "Data Analyst"]
+    keywords_to_test = ["Data scientist"]
     offers = run_wttj_scraper(
-        keywords_to_test, max_offres_per_kw=3, save_to_db=True, headless=True
+        keywords_to_test, max_offres_per_kw=10, save_to_db=True, headless=True
     )
 
     print(f"\nRésultat : {len(offers)} offre(s) traité(es)")
