@@ -128,8 +128,8 @@ def clean_description(html_text: str) -> str:
         r"\b(Voir plus|Voir moins|Show more|Show less)\b", "", text, flags=re.IGNORECASE
     )
 
-    # 4. Standardisation des apostrophes
-    text = re.sub(r"[''`´]", "'", text)
+    # 4. Standardisation des apostrophes (inclut les apostrophes typographiques françaises)
+    text = re.sub("[\u2018\u2019'`\u00b4]", "'", text)
 
     # 5. Suppression des caractères de contrôle
     text = "".join(

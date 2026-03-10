@@ -39,37 +39,16 @@ class JobMatcher:
         if not profile_vector:
             return []
 
-        # Construction de la requête using SQLAlchemy ORM (pas SQL brut)
+        # Construction de la requête avec bind parameters (pas d'interpolation directe)
         limit_date = datetime.now() - timedelta(days=days_limit)
 
-        # Convertir le vecteur en format string pour PostgreSQL et l'échapper
-        vector_param = str(profile_vector).replace("'", "''")  # Échapper les quotes
+        # Convertir le vecteur en format string pour PostgreSQL
+        vector_str = str(profile_vector)
 
-        # Construire les filtres dynamiques avec échappement SQL
-        location_filter = ""
-        if location:
-            escaped_location = location.replace("'", "''")
-            location_filter = f"""AND (
-                job_offers.city ILIKE '%{escaped_location}%'
-                OR job_offers.department ILIKE '%{escaped_location}%'
-                OR job_offers.region ILIKE '%{escaped_location}%'
-            )"""
-
-        contract_filter = ""
-        if contract_type:
-            escaped_contract = contract_type.replace("'", "''")
-            contract_filter = f"AND job_offers.contract_type = '{escaped_contract}'"
-
-        experience_filter = ""
-        if experience:
-            escaped_experience = experience.replace("'", "''")
-            experience_filter = (
-                f"AND job_offers.required_experience ILIKE '%{escaped_experience}%'"
-            )
-
-        # Construire la requête SQL complète (une seule f-string)
-        sql_query = f"""
-        SELECT 
+        # Requête SQL avec bind parameters pour toutes les entrées utilisateur
+        # Les filtres optionnels utilisent la forme (:param IS NULL OR condition)
+        sql_query = text("""
+        SELECT
             job_offers.id,
             job_offers.title,
             job_offers.company,
@@ -81,20 +60,37 @@ class JobMatcher:
             job_offers.url,
             job_offers.date_publication,
             job_offers.source,
-            (1 - (job_offers.embedding <=> '{vector_param}'::vector)) as similarity_score
+            (1 - (job_offers.embedding <=> CAST(:vector AS vector))) AS similarity_score
         FROM job_offers
-        WHERE job_offers.date_scraping >= '{limit_date.isoformat()}'
-        {location_filter}
-        {contract_filter}
-        {experience_filter}
+        WHERE (
+            job_offers.date_publication >= :limit_date
+            OR (job_offers.date_publication IS NULL AND job_offers.date_scraping >= :limit_date)
+        )
+        AND (:location IS NULL OR (
+            job_offers.city ILIKE '%' || :location || '%'
+            OR job_offers.department ILIKE '%' || :location || '%'
+            OR job_offers.region ILIKE '%' || :location || '%'
+        ))
+        AND (:contract_type IS NULL OR job_offers.contract_type = :contract_type)
+        AND (:experience IS NULL OR job_offers.required_experience ILIKE '%' || :experience || '%')
         ORDER BY similarity_score DESC
-        LIMIT {top_n}
-        """
+        LIMIT :top_n
+        """)
 
         logger.info(f"Recherche des {top_n} meilleures correspondances avec filtres...")
 
-        # Exécuter la requête directement
-        results = self.db.execute(text(sql_query)).fetchall()
+        # Exécuter la requête avec les bind parameters
+        results = self.db.execute(
+            sql_query,
+            {
+                "vector": vector_str,
+                "limit_date": limit_date,
+                "location": location,
+                "contract_type": contract_type,
+                "experience": experience,
+                "top_n": top_n,
+            },
+        ).fetchall()
 
         # Post-process: construire la propriété 'location' pour chaque résultat
         # Convertir les RowTuple en dictionnaires pour ajouter la propriété calculée

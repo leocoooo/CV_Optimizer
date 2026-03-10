@@ -14,7 +14,7 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
 
     # ===== IDENTIFIANTS =====
     id = Column(String(64), primary_key=True, index=True)
-    url = Column(String(500), unique=True, nullable=False, index=True)
+    url = Column(String(500), unique=True, nullable=True, index=True)
     source = Column(
         String(50), nullable=False, index=True
     )  # 'Welcome to the Jungle', 'HelloWork', 'France Travail'
@@ -36,7 +36,7 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
 
     # ===== LOCALISATION =====
     city = Column(String(100), index=True)  # Ville
-    department = Column(String(50))  # Département (ex: "Île-de-France")
+    department = Column(String(50))  # Département (ex: "Hauts-de-Seine" ou "Loire-Atlantique")
     region = Column(String(100))  # Région
 
     # ===== ENTREPRISE =====

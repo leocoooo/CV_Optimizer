@@ -67,9 +67,10 @@ def run_collector(keywords_to_fetch, max_offers=50):
                     f"API batch: {len(raw_offers)} offres trouvées (offset {offset})"
                 )
 
-                # Conversion et filtrage des doublons
+                # Conversion et filtrage des doublons - accumulation par batch
+                batch_offers = []
                 for raw_offer in raw_offers:
-                    if count_for_kw >= max_offers:
+                    if count_for_kw + len(batch_offers) >= max_offers:
                         break
 
                     converted_offer = convert_ft_offer(raw_offer, api)
@@ -80,18 +81,19 @@ def run_collector(keywords_to_fetch, max_offers=50):
                         logger.debug(f"Offre {offer_id} déjà en base, ignorée")
                         continue
 
-                    # Nouvelle offre trouvée - insérer
-                    count_inserted_this = save_offers_to_db(
-                        db, [converted_offer], source_name="France Travail"
-                    )
+                    batch_offers.append(converted_offer)
+                    existing_ids.add(offer_id)  # Eviter doublon dans le même batch
 
-                    if count_inserted_this > 0:
-                        count_for_kw += 1
-                        total_inserted += count_inserted_this
-                        existing_ids.add(
-                            offer_id
-                        )  # Ajouter à la liste pour éviter doublon dans le même batch
-                        logger.info(f"[{count_for_kw}/{max_offers}] Offre ajoutée")
+                # Insérer le batch en une seule fois
+                if batch_offers:
+                    count_inserted_this = save_offers_to_db(
+                        db, batch_offers, source_name="France Travail"
+                    )
+                    count_for_kw += count_inserted_this
+                    total_inserted += count_inserted_this
+                    logger.info(
+                        f"[{count_for_kw}/{max_offers}] {count_inserted_this} offres ajoutées"
+                    )
 
                 # Si on n'a pas assez d'offres, continuer à la prochaine batch
                 if count_for_kw < max_offers:

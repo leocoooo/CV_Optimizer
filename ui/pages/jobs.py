@@ -49,9 +49,9 @@ def render(api_client: APIClient, api_status: bool):
     with col3:
         source = st.selectbox(
             "Source",
-            ["Aucune filter", "France Travail", "HelloWork", "Welcome to the Jungle"],
+            ["Aucun filtre", "France Travail", "HelloWork", "Welcome to the Jungle"],
         )
-        if source == "Aucune filter":
+        if source == "Aucun filtre":
             source = None
 
         days_limit = st.slider(
