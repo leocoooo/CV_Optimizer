@@ -113,5 +113,5 @@ def run_collector(keywords_to_fetch, max_offers=50):
 
 
 if __name__ == "__main__":
-    keywords_to_fetch = ["Data Engineer", "Data Scientist", "Data Analyst"]
-    run_collector(keywords_to_fetch, 3)
+    keywords_to_fetch = ["Data Scientist"]
+    run_collector(keywords_to_fetch, 10)
