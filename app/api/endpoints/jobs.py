@@ -66,8 +66,8 @@ async def get_jobs(
     *Localisation* :
     - location : Localisation générique (ville, département, région)
     - city : Ville spécifique (ex: "Paris")
-    - department : Département (ex: "Île-de-France")
-    - region : Région (ex: "Occitanie")
+    - department : Département (ex: "Hauts-de-Seine")
+    - region : Région (ex: "Île-de-France")
 
     *Poste* :
     - contract_type : Type de contrat (ex: "CDI", "CDD", "Stage", "Alternance")

@@ -482,7 +482,7 @@ def convert_ft_offer(offer: dict, ft_api: "FranceTravailAPI | None" = None) -> d
     # Construction de l'offre formatée avec l'ID FT original
     return {
         "id": ft_id,  # Utiliser l'ID de France Travail directement
-        "url": offer.get("origineOffre", {}).get("urlOrigine", ""),
+        "url": offer.get("origineOffre", {}).get("urlOrigine") or None,
         "source": "France Travail",
         "date_publication": date_publication,
         "date_scraping": datetime.now().isoformat(),

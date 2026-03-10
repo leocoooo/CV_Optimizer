@@ -48,7 +48,10 @@ class JobFilter(BaseModel):
         30,
         ge=1,
         le=365,
-        description="Offres des N derniers jours (basé sur date_scraping)",
+        description=(
+            "Offres publiées au cours des N derniers jours "
+            "(basé sur date_publication, avec fallback sur date_scraping si manquante)"
+        ),
     )
 
 
