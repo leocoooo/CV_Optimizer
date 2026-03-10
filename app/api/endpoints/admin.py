@@ -249,18 +249,16 @@ async def get_stats(
         )
         without_embeddings = total_jobs - with_embeddings
 
-        # Offre la plus récente
-        latest_job = (
-            db.query(JobOffer).order_by(JobOffer.actualisation_date.desc()).first()
-        )
+        # Offre la plus récente (basée on date_scraping = date d'insertion)
+        latest_job = db.query(JobOffer).order_by(JobOffer.date_scraping.desc()).first()
 
         latest_job_info = None
         if latest_job:
             latest_job_info = {
                 "title": latest_job.title,
                 "company": latest_job.company,
-                "date": latest_job.actualisation_date.isoformat()
-                if latest_job.actualisation_date
+                "date": latest_job.date_scraping.isoformat()
+                if latest_job.date_scraping
                 else None,
             }
 

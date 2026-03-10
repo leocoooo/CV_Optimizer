@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Text, DateTime, func
 from pgvector.sqlalchemy import Vector
 from src.database.database import Base
+from datetime import datetime
 
 
 class JobOffer(Base):  # type: ignore[misc,valid-type]
@@ -22,7 +23,7 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     date_publication = Column(DateTime)  # Date de parution de l'offre
     date_scraping = Column(
         DateTime, server_default=func.now()
-    )  # Date de scraping (par le system)
+    )  # Date de scraping/insertion (par le system)
 
     # ===== POSTE =====
     title = Column(String(255), nullable=False, index=True)
@@ -58,6 +59,20 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     # ===== VECTEUR D'EMBEDDING =====
     # 384 dimensions pour le modèle all-MiniLM-L6-v2
     embedding = Column(Vector(384))
+
+    # ===== PROPRIÉTÉS CALCULÉES (pour compatibilité API) =====
+    @property
+    def created_at(self) -> datetime | None:
+        """Alias de date_scraping pour compatibilité API."""
+        return self.date_scraping  # type: ignore[return-value]
+
+    @property
+    def location(self) -> str | None:
+        """Construit une chaîne de localisation à partir de city, department, region."""
+        parts: list[str] = [
+            str(p).strip() for p in [self.city, self.department, self.region] if p
+        ]
+        return " - ".join(parts) if parts else None
 
     def __repr__(self):
         return f"<JobOffer(id={self.id}, title='{self.title}', company='{self.company}', source='{self.source}')>"

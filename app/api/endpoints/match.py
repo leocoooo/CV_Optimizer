@@ -173,17 +173,26 @@ async def match_cv(
         # Conversion des résultats en schéma Pydantic
         matches = []
         for row in results:
+            # Gérer le cas où similarity_score serait None
+            similarity_score = None
+            if hasattr(row, "similarity_score") and row.similarity_score is not None:
+                similarity_score = round(row.similarity_score, 4)
+
             match = JobMatch(
                 job_id=row.id,
                 title=row.title,
                 company=row.company,
-                location=row.location,
-                contract_type=row.contract_type,
-                required_experience=row.required_experience,
-                similarity_score=round(row.similarity_score, 4),
-                url=row.url,
-                creation_date=row.creation_date
-                if hasattr(row, "creation_date")
+                location=row.location if hasattr(row, "location") else None,
+                contract_type=row.contract_type
+                if hasattr(row, "contract_type")
+                else None,
+                required_experience=row.required_experience
+                if hasattr(row, "required_experience")
+                else None,
+                similarity_score=similarity_score or 0.0,  # Fallback à 0.0 si None
+                url=row.url if hasattr(row, "url") else None,
+                date_publication=row.date_publication
+                if hasattr(row, "date_publication")
                 else None,
                 source=row.source if hasattr(row, "source") else None,
             )
