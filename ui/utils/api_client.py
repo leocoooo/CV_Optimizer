@@ -77,10 +77,28 @@ class APIClient:
         contract_type: Optional[str] = None,
         experience: Optional[str] = None,
         source: Optional[str] = None,
+        sector: Optional[str] = None,
+        remote_mode: Optional[str] = None,
+        company: Optional[str] = None,
+        required_education: Optional[str] = None,
         days_limit: int = 30,
     ) -> Dict[str, Any]:
         """
-        Recherche des offres d'emploi.
+        Recherche des offres d'emploi avec filtres avancés.
+
+        Args:
+            page: Numéro de page
+            page_size: Taille de page
+            keywords: Mots-clés de recherche
+            location: Localisation
+            contract_type: Type de contrat
+            experience: Niveau d'expérience
+            source: Source de l'offre
+            sector: Secteur d'activité
+            remote_mode: Mode de télétravail
+            company: Entreprise
+            required_education: Niveau d'études requis
+            days_limit: Offres des N derniers jours
 
         Returns:
             Résultats de la recherche
@@ -101,6 +119,14 @@ class APIClient:
             params["experience"] = experience
         if source:
             params["source"] = source
+        if sector:
+            params["sector"] = sector
+        if remote_mode:
+            params["remote_mode"] = remote_mode
+        if company:
+            params["company"] = company
+        if required_education:
+            params["required_education"] = required_education
 
         response = requests.get(f"{self.base_url}/api/jobs", params=params, timeout=10)
         response.raise_for_status()
