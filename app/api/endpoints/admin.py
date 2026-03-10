@@ -15,7 +15,7 @@ from app.core.exceptions import DatabaseError
 from app.utils import run_in_thread
 
 # Import des services
-from src.services.collector import run_collector
+from src.services.france_travail_collector import run_collector
 from src.services.processor import process_embeddings
 from src.services.scrappe_hw import run_hw_scraper
 from src.services.scrappe_wttj import run_wttj_scraper
@@ -249,18 +249,16 @@ async def get_stats(
         )
         without_embeddings = total_jobs - with_embeddings
 
-        # Offre la plus récente
-        latest_job = (
-            db.query(JobOffer).order_by(JobOffer.actualisation_date.desc()).first()
-        )
+        # Offre la plus récente (basée on date_scraping = date d'insertion)
+        latest_job = db.query(JobOffer).order_by(JobOffer.date_scraping.desc()).first()
 
         latest_job_info = None
         if latest_job:
             latest_job_info = {
                 "title": latest_job.title,
                 "company": latest_job.company,
-                "date": latest_job.actualisation_date.isoformat()
-                if latest_job.actualisation_date
+                "date": latest_job.date_scraping.isoformat()
+                if latest_job.date_scraping
                 else None,
             }
 

@@ -6,7 +6,7 @@ Permet de parcourir et filtrer les offres en base.
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, nullslast
 from datetime import datetime, timedelta
 from loguru import logger
 
@@ -30,11 +30,26 @@ router = APIRouter()
 async def get_jobs(
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(20, ge=1, le=100, description="Taille de page"),
-    location: Optional[str] = Query(None, description="Filtrer par localisation"),
-    contract_type: Optional[str] = Query(None, description="Type de contrat"),
+    keywords: Optional[str] = Query(
+        None, description="Mots-clés dans le titre ou description"
+    ),
+    location: Optional[str] = Query(
+        None, description="Filtrer par localisation (ville, département, région)"
+    ),
+    city: Optional[str] = Query(None, description="Filtrer par ville spécifique"),
+    department: Optional[str] = Query(None, description="Filtrer par département"),
+    region: Optional[str] = Query(None, description="Filtrer par région"),
+    contract_type: Optional[str] = Query(
+        None, description="Type de contrat (CDI, CDD, Stage, etc.)"
+    ),
+    sector: Optional[str] = Query(None, description="Secteur d'activité"),
+    remote_mode: Optional[str] = Query(None, description="Mode de télétravail"),
     experience: Optional[str] = Query(None, description="Niveau d'expérience (D/E/S)"),
+    required_education: Optional[str] = Query(
+        None, description="Niveau d'étude requis"
+    ),
+    company: Optional[str] = Query(None, description="Nom de l'entreprise"),
     source: Optional[str] = Query(None, description="Source de l'offre"),
-    keywords: Optional[str] = Query(None, description="Mots-clés dans le titre"),
     days_limit: int = Query(
         30, ge=1, le=365, description="Offres des N derniers jours"
     ),
@@ -43,35 +58,65 @@ async def get_jobs(
     """
     Liste paginée des offres d'emploi.
 
-    **Filtres disponibles** :
-    - location : "Paris", "Lyon", etc.
-    - contract_type : "CDI", "CDD", "Stage", "Alternance"
-    - experience : "D" (Débutant), "E", "S"
-    - source : "France Travail", "HelloWork", "Welcome to the Jungle"
-    - keywords : Recherche dans le titre (ex: "Python", "Data")
-    - days_limit : Limiter aux N derniers jours (défaut: 30, basé sur la date d'insertion en base)
+    **Filtres disponibles (tous optionnels)** :
+
+    *Recherche textuelle* :
+    - keywords : Mots-clés dans le titre ou description (ex: "Python", "Data")
+
+    *Localisation* :
+    - location : Localisation générique (ville, département, région)
+    - city : Ville spécifique (ex: "Paris")
+    - department : Département (ex: "Île-de-France")
+    - region : Région (ex: "Occitanie")
+
+    *Poste* :
+    - contract_type : Type de contrat (ex: "CDI", "CDD", "Stage", "Alternance")
+    - sector : Secteur d'activité
+    - remote_mode : Mode de télétravail
+
+    *Profil* :
+    - experience : Niveau d'expérience (ex: "D" Débutant, "E", "S")
+    - required_education : Niveau d'étude requis
+
+    *Entreprise* :
+    - company : Nom de l'entreprise
+    - source : Source (ex: "France Travail", "HelloWork", "Welcome to the Jungle")
+
+    *Dates* :
+    - days_limit : Limiter aux N derniers jours (défaut: 30, basé sur date de publication de l'offre)
 
     **Pagination** :
     - page : Numéro de page (commence à 1)
     - page_size : Nombre de résultats par page (1-100, défaut: 20)
 
-    **Note** : Le filtre days_limit utilise la date d'insertion en base (created_at),
-    ce qui permet d'inclure toutes les sources (France Travail, HelloWork, WTTJ).
-
-    **Exemple d'utilisation** :
+    **Exemples d'utilisation** :
     ```bash
-    curl "http://localhost:8000/api/jobs?location=Paris&contract_type=CDI&page=1&page_size=20"
+    # Recherche à Paris avec CDI
+    curl "http://localhost:8000/api/jobs?location=Paris&contract_type=CDI&page=1"
+
+    # Recherche Data Engineer en Occitanie
+    curl "http://localhost:8000/api/jobs?keywords=Data%20Engineer&region=Occitanie"
+
+    # Filtrer par secteur et expérience
+    curl "http://localhost:8000/api/jobs?sector=IT&experience=S"
     ```
 
     Args:
         page: Numéro de page
         page_size: Taille de page
-        location: Filtre localisation (optionnel)
-        contract_type: Filtre type de contrat (optionnel)
-        experience: Filtre expérience (optionnel)
-        source: Filtre source (optionnel)
         keywords: Recherche mots-clés (optionnel)
-        days_limit: Limite de jours (défaut: 30, basé sur created_at)
+        location: Filtre localisation générique (optionnel)
+        city: Filtre ville (optionnel)
+        department: Filtre département (optionnel)
+        region: Filtre région (optionnel)
+        contract_type: Filtre type de contrat (optionnel)
+        sector: Filtre secteur (optionnel)
+        remote_mode: Filtre télétravail (optionnel)
+        experience: Filtre expérience (optionnel)
+        required_education: Filtre niveau étude (optionnel)
+        company: Filtre entreprise (optionnel)
+        source: Filtre source (optionnel)
+        days_limit: Limite de jours (défaut: 30, basé sur date de publication)
         db: Session DB (injecté)
 
     Returns:
@@ -84,16 +129,31 @@ async def get_jobs(
     # Construction de la requête de base
     query = db.query(JobOffer)
 
-    # Filtre sur la date d'insertion en base (created_at)
-    # Cette date existe pour toutes les sources (France Travail, HelloWork, WTTJ)
+    # Filtre sur la date de publication (date_publication) - date de parution de l'offre
+    # Pour les offres sans date de publication, on les inclut aussi (fallback sur date_scraping)
     limit_date = datetime.now() - timedelta(days=days_limit)
-    query = query.filter(JobOffer.created_at >= limit_date)
+    query = query.filter(
+        or_(
+            JobOffer.date_publication >= limit_date,
+            (
+                JobOffer.date_publication.is_(None)
+                & (JobOffer.date_scraping >= limit_date)
+            ),
+        )
+    )
 
     # Application des filtres optionnels
     filters_applied = {}
 
     if location:
-        query = query.filter(JobOffer.location.ilike(f"%{location}%"))
+        # Filtrer sur city, department, ou region
+        query = query.filter(
+            or_(
+                JobOffer.city.ilike(f"%{location}%"),
+                JobOffer.department.ilike(f"%{location}%"),
+                JobOffer.region.ilike(f"%{location}%"),
+            )
+        )
         filters_applied["location"] = location
 
     if contract_type:
@@ -119,8 +179,39 @@ async def get_jobs(
         )
         filters_applied["keywords"] = keywords
 
-    # Tri par date d'insertion en base décroissante (plus récentes en premier)
-    query = query.order_by(JobOffer.created_at.desc())
+    if city:
+        query = query.filter(JobOffer.city.ilike(f"%{city}%"))
+        filters_applied["city"] = city
+
+    if department:
+        query = query.filter(JobOffer.department.ilike(f"%{department}%"))
+        filters_applied["department"] = department
+
+    if region:
+        query = query.filter(JobOffer.region.ilike(f"%{region}%"))
+        filters_applied["region"] = region
+
+    if sector:
+        query = query.filter(JobOffer.sector.ilike(f"%{sector}%"))
+        filters_applied["sector"] = sector
+
+    if remote_mode:
+        query = query.filter(JobOffer.remote_mode.ilike(f"%{remote_mode}%"))
+        filters_applied["remote_mode"] = remote_mode
+
+    if company:
+        query = query.filter(JobOffer.company.ilike(f"%{company}%"))
+        filters_applied["company"] = company
+
+    if required_education:
+        query = query.filter(
+            JobOffer.required_education.ilike(f"%{required_education}%")
+        )
+        filters_applied["required_education"] = required_education
+
+    # Tri par date de publication en descendant (plus récentes en premier)
+    # Si date_publication est NULL, la mettre à la fin
+    query = query.order_by(nullslast(JobOffer.date_publication.desc()))
 
     # Compte total (avant pagination)
     total = query.count()
@@ -135,11 +226,18 @@ async def get_jobs(
         filter_obj = None
         if filters_applied:
             filter_obj = JobFilter(
-                location=filters_applied.get("location"),
-                contract_type=filters_applied.get("contract_type"),
-                experience=filters_applied.get("experience"),
-                source=filters_applied.get("source"),
                 keywords=filters_applied.get("keywords"),
+                location=filters_applied.get("location"),
+                city=filters_applied.get("city"),
+                department=filters_applied.get("department"),
+                region=filters_applied.get("region"),
+                contract_type=filters_applied.get("contract_type"),
+                sector=filters_applied.get("sector"),
+                remote_mode=filters_applied.get("remote_mode"),
+                experience=filters_applied.get("experience"),
+                required_education=filters_applied.get("required_education"),
+                company=filters_applied.get("company"),
+                source=filters_applied.get("source"),
                 days_limit=days_limit,
             )
 
@@ -182,19 +280,40 @@ async def get_jobs(
                 description_preview += "..."
 
         job_response = JobResponse(
+            # ===== IDENTIFIANTS =====
             id=str(job.id),
+            url=str(job.url) if job.url else None,
+            source=str(job.source) if job.source else None,
+            # ===== POSTE =====
             title=str(job.title),
-            company=str(job.company),
-            location=str(job.location) if job.location else None,
-            description=description_preview,
+            sector=str(job.sector) if job.sector else None,
             contract_type=str(job.contract_type) if job.contract_type else None,
+            remote_mode=str(job.remote_mode) if job.remote_mode else None,
+            salary=str(job.salary) if job.salary else None,
+            # ===== LOCALISATION =====
+            city=str(job.city) if job.city else None,
+            department=str(job.department) if job.department else None,
+            region=str(job.region) if job.region else None,
+            location=job.location,  # Propriété calculée du modèle
+            # ===== ENTREPRISE =====
+            company=str(job.company),
+            company_size=str(job.company_size) if job.company_size else None,
+            # ===== PROFIL DEMANDÉ =====
             required_experience=str(job.required_experience)
             if job.required_experience
             else None,
-            url=str(job.url) if job.url else None,
-            source=str(job.source) if job.source else None,
-            creation_date=getattr(job, "creation_date", None),
-            actualisation_date=getattr(job, "actualisation_date", None),
+            required_education=str(job.required_education)
+            if job.required_education
+            else None,
+            competences=str(job.competences) if job.competences else None,
+            soft_skills=str(job.soft_skills) if job.soft_skills else None,
+            languages=str(job.languages) if job.languages else None,
+            # ===== CONTENU TEXTUEL =====
+            description=description_preview,
+            job_profile=str(job.job_profile) if job.job_profile else None,
+            # ===== DATES =====
+            date_publication=job.date_publication,  # type: ignore[arg-type]
+            date_scraping=job.date_scraping,  # type: ignore[arg-type]
         )
         job_responses.append(job_response)
 
@@ -202,11 +321,18 @@ async def get_jobs(
     filter_obj = None
     if filters_applied:
         filter_obj = JobFilter(
-            location=filters_applied.get("location"),
-            contract_type=filters_applied.get("contract_type"),
-            experience=filters_applied.get("experience"),
-            source=filters_applied.get("source"),
             keywords=filters_applied.get("keywords"),
+            location=filters_applied.get("location"),
+            city=filters_applied.get("city"),
+            department=filters_applied.get("department"),
+            region=filters_applied.get("region"),
+            contract_type=filters_applied.get("contract_type"),
+            sector=filters_applied.get("sector"),
+            remote_mode=filters_applied.get("remote_mode"),
+            experience=filters_applied.get("experience"),
+            required_education=filters_applied.get("required_education"),
+            company=filters_applied.get("company"),
+            source=filters_applied.get("source"),
             days_limit=days_limit,
         )
 
@@ -258,17 +384,40 @@ async def get_job_details(job_id: str, db: Session = Depends(get_db)):
 
     # Retourne la description complète (pas tronquée)
     return JobResponse(
+        # ===== IDENTIFIANTS =====
         id=str(job.id),
+        url=str(job.url) if job.url else None,
+        source=str(job.source) if job.source else None,
+        # ===== POSTE =====
         title=str(job.title),
-        company=str(job.company),
-        location=str(job.location) if job.location else None,
-        description=str(job.description) if job.description else None,
+        sector=str(job.sector) if job.sector else None,
         contract_type=str(job.contract_type) if job.contract_type else None,
+        remote_mode=str(job.remote_mode) if job.remote_mode else None,
+        salary=str(job.salary) if job.salary else None,
+        # ===== LOCALISATION =====
+        city=str(job.city) if job.city else None,
+        department=str(job.department) if job.department else None,
+        region=str(job.region) if job.region else None,
+        location=job.location,  # Propriété calculée du modèle
+        # ===== ENTREPRISE =====
+        company=str(job.company),
+        company_size=str(job.company_size) if job.company_size else None,
+        # ===== PROFIL DEMANDÉ =====
         required_experience=str(job.required_experience)
         if job.required_experience
         else None,
-        url=str(job.url) if job.url else None,
-        source=str(job.source) if job.source else None,
-        creation_date=getattr(job, "creation_date", None),
-        actualisation_date=getattr(job, "actualisation_date", None),
+        required_education=str(job.required_education)
+        if job.required_education
+        else None,
+        competences=str(job.competences) if job.competences else None,
+        soft_skills=str(job.soft_skills) if job.soft_skills else None,
+        languages=str(job.languages) if job.languages else None,
+        # ===== CONTENU TEXTUEL =====
+        description=str(job.description)
+        if job.description
+        else None,  # Description complète (pas tronquée)
+        job_profile=str(job.job_profile) if job.job_profile else None,
+        # ===== DATES =====
+        date_publication=job.date_publication,  # type: ignore[arg-type]
+        date_scraping=job.date_scraping,  # type: ignore[arg-type]
     )
