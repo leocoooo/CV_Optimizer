@@ -23,12 +23,14 @@ def gradient_header(title: str, subtitle: str, gradient: str = "purple"):
     safe_title = html.escape(title)
     safe_subtitle = html.escape(subtitle)
 
+    subtitle_color = "rgba(255,255,255,0.9)" if gradient != "pastel" else "rgba(51,51,51,0.85)"
+
     st.markdown(
         f"""
         <div style='background: {gradient_css}; 
                     padding: 2rem; border-radius: 12px; margin-bottom: 2rem;'>
             <h1 style='color: {text_color}; margin: 0; border: none;'>{safe_title}</h1>
-            <p style='color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 1.1rem;'>
+            <p style='color: {subtitle_color}; margin: 0.5rem 0 0 0; font-size: 1.1rem;'>
                 {safe_subtitle}
             </p>
         </div>

@@ -5,6 +5,7 @@ Helpers pour l'upload et la gestion de fichiers.
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 from typing import Optional
+from ui.utils.config import MAX_FILE_SIZE_MB
 
 
 def cv_uploader(key: Optional[str] = None) -> Optional[UploadedFile]:
@@ -39,6 +40,11 @@ def cv_uploader(key: Optional[str] = None) -> Optional[UploadedFile]:
 
     if uploaded_file:
         file_size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
+        if file_size_mb > MAX_FILE_SIZE_MB:
+            st.error(
+                f"❌ Fichier trop volumineux: {file_size_mb:.2f} MB (max {MAX_FILE_SIZE_MB} MB)"
+            )
+            return None
         st.success(f"✅ Fichier chargé: {uploaded_file.name} ({file_size_mb:.2f} MB)")
 
     return uploaded_file
