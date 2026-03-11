@@ -73,7 +73,8 @@ class JobMatcher:
         ))
         AND (:contract_type IS NULL OR job_offers.contract_type = :contract_type)
         AND (:experience IS NULL OR job_offers.required_experience ILIKE '%' || :experience || '%')
-        ORDER BY similarity_score DESC
+        AND job_offers.embedding IS NOT NULL
+        ORDER BY similarity_score DESC NULLS LAST
         LIMIT :top_n
         """)
 

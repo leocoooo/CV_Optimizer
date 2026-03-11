@@ -7,7 +7,7 @@ from datetime import datetime
 class JobOffer(Base):  # type: ignore[misc,valid-type]
     """
     Modèle unifié pour les offres d'emploi de toutes les sources.
-    Tous les champs sont NULL autoriés pour permettre les variations entre sources.
+    Tous les champs sont NULL autorisés pour permettre les variations entre sources.
     """
 
     __tablename__ = "job_offers"
@@ -23,7 +23,7 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     date_publication = Column(DateTime)  # Date de parution de l'offre
     date_scraping = Column(
         DateTime, server_default=func.now()
-    )  # Date de scraping/insertion (par le system)
+    )  # Date de scraping/insertion (par le système)
 
     # ===== POSTE =====
     title = Column(String(255), nullable=False, index=True)

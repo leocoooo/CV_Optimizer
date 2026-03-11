@@ -44,7 +44,7 @@ def render():
 
     2. Lancez l'application Streamlit :
        ```bash
-       streamlit run streamlit_app_new.py
+       streamlit run streamlit_app.py
        ```
     """)
 

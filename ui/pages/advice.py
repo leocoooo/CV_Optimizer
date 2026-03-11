@@ -2,6 +2,7 @@
 Page de conseils LLM personnalisés.
 """
 
+import html
 import streamlit as st
 from ui.utils.api_client import APIClient
 from ui.components.cards import gradient_header, metric_card, status_message, info_card
@@ -69,7 +70,7 @@ def render(api_client: APIClient, api_status: bool):
                         f"""
                         <div style='background: #f8f9fa; padding: 1.5rem; border-radius: 8px; 
                                     border-left: 4px solid #fa709a;'>
-                            {result["advice"]}
+                            {html.escape(result["advice"])}
                         </div>
                         """,
                         unsafe_allow_html=True,
