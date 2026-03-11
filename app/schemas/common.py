@@ -52,3 +52,15 @@ class MessageResponse(BaseModel):
     message: str = Field(..., description="Message de réponse")
     success: bool = Field(True, description="Indicateur de succès")
     data: Optional[Dict[str, Any]] = Field(None, description="Données additionnelles")
+
+
+class CollectRequest(BaseModel):
+    """Requête de collecte d'offres."""
+
+    keywords: list[str] = Field(
+        ..., min_length=1, description="Liste de mots-clés pour la recherche"
+    )
+    max_offers: int = Field(
+        10, ge=1, le=100, description="Nombre max d'offres par mot-clé"
+    )
+    enable_scraping: bool = Field(True, description="Activer le scraping web")

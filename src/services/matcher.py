@@ -1,4 +1,5 @@
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 from src.database.database import SessionLocal
 from src.services.embedder import Embedder
 from loguru import logger
@@ -11,7 +12,7 @@ settings = get_settings()
 class JobMatcher:
     def __init__(self):
         self.embedder = Embedder()
-        self.db = SessionLocal()
+        self.db: Session = SessionLocal()
 
     def find_matches(
         self,
@@ -38,46 +39,95 @@ class JobMatcher:
         if not profile_vector:
             return []
 
-        # 1. Construction dynamique de la clause WHERE
-        filters = []
-        params = {"vector": str(profile_vector), "limit": top_n}
-
-        # Calcul de la date limite pour ne pas avoir des offres trop vieilles
+        # Construction de la requête avec bind parameters (pas d'interpolation directe)
         limit_date = datetime.now() - timedelta(days=days_limit)
-        filters.append("actualisation_date >= :limit_date")
-        params["limit_date"] = limit_date
 
-        if location:
-            filters.append("location ILIKE :location")
-            params["location"] = f"%{location}%"
+        # Convertir le vecteur en format string pour PostgreSQL
+        vector_str = str(profile_vector)
 
-        if contract_type:
-            filters.append("contract_type = :contract_type")
-            params["contract_type"] = contract_type
-
-        if experience:
-            filters.append("required_experience ILIKE :experience")
-            params["experience"] = f"%{experience}%"
-
-        # Assemblage de la clause WHERE
-        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
-
-        # 2. Requête SQL Hybride (Vecteur + Filtres Stricts)
-        query_str = f"""
-            SELECT id, title, company, location, contract_type, required_experience, url, id,
-                (1 - (embedding <=> :vector)) AS similarity_score
-            FROM job_offers
-            {where_clause}
-            ORDER BY similarity_score DESC
-            LIMIT :limit
-        """
-
-        query = text(query_str)
+        # Requête SQL avec bind parameters pour toutes les entrées utilisateur
+        # Les filtres optionnels utilisent la forme (:param IS NULL OR condition)
+        sql_query = text("""
+        SELECT
+            job_offers.id,
+            job_offers.title,
+            job_offers.company,
+            job_offers.city,
+            job_offers.department,
+            job_offers.region,
+            job_offers.contract_type,
+            job_offers.required_experience,
+            job_offers.url,
+            job_offers.date_publication,
+            job_offers.source,
+            (1 - (job_offers.embedding <=> CAST(:vector AS vector))) AS similarity_score
+        FROM job_offers
+        WHERE (
+            job_offers.date_publication >= :limit_date
+            OR (job_offers.date_publication IS NULL AND job_offers.date_scraping >= :limit_date)
+        )
+        AND (:location IS NULL OR (
+            job_offers.city ILIKE '%' || :location || '%'
+            OR job_offers.department ILIKE '%' || :location || '%'
+            OR job_offers.region ILIKE '%' || :location || '%'
+        ))
+        AND (:contract_type IS NULL OR job_offers.contract_type = :contract_type)
+        AND (:experience IS NULL OR job_offers.required_experience ILIKE '%' || :experience || '%')
+        AND job_offers.embedding IS NOT NULL
+        ORDER BY similarity_score DESC NULLS LAST
+        LIMIT :top_n
+        """)
 
         logger.info(f"Recherche des {top_n} meilleures correspondances avec filtres...")
-        results = self.db.execute(query, params).fetchall()
 
-        return results
+        # Exécuter la requête avec les bind parameters
+        results = self.db.execute(
+            sql_query,
+            {
+                "vector": vector_str,
+                "limit_date": limit_date,
+                "location": location,
+                "contract_type": contract_type,
+                "experience": experience,
+                "top_n": top_n,
+            },
+        ).fetchall()
+
+        # Post-process: construire la propriété 'location' pour chaque résultat
+        # Convertir les RowTuple en dictionnaires pour ajouter la propriété calculée
+        processed_results = []
+        for row in results:
+            # Accéder aux colonnes par indice: id, title, company, city, dept, region, contract, exp, url, pub_date, source, similarity_score
+            row_dict: dict[str, object] = {
+                "id": row[0],
+                "title": row[1],
+                "company": row[2],
+                "city": row[3],
+                "department": row[4],
+                "region": row[5],
+                "contract_type": row[6],
+                "required_experience": row[7],
+                "url": row[8],
+                "date_publication": row[9],
+                "source": row[10],
+                "similarity_score": row[11]
+                if row[11] is not None
+                else 0.0,  # Fallback si None
+            }
+            # Construire la propriété location
+            location_parts: list[str] = [
+                str(row_dict[k])
+                for k in ["city", "department", "region"]
+                if row_dict.get(k) is not None
+            ]
+            row_dict["location"] = (
+                " - ".join(location_parts) if location_parts else None
+            )
+
+            # Convertir en objet simple pour que match.py puisse y accéder
+            processed_results.append(type("Row", (), row_dict)())
+
+        return processed_results
 
 
 if __name__ == "__main__":

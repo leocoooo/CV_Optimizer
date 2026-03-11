@@ -1,31 +1,78 @@
 from sqlalchemy import Column, String, Text, DateTime, func
 from pgvector.sqlalchemy import Vector
 from src.database.database import Base
+from datetime import datetime
 
 
 class JobOffer(Base):  # type: ignore[misc,valid-type]
+    """
+    Modèle unifié pour les offres d'emploi de toutes les sources.
+    Tous les champs sont NULL autorisés pour permettre les variations entre sources.
+    """
+
     __tablename__ = "job_offers"
 
+    # ===== IDENTIFIANTS =====
     id = Column(String(64), primary_key=True, index=True)
-    title = Column(String(255), nullable=False)
-    company = Column(String(255))
-    location = Column(String(100))
-    description = Column(Text, nullable=False)
-    creation_date = Column(DateTime)
-    actualisation_date = Column(DateTime)
-    contract_type = Column(String(50))
-    required_experience = Column(String(100))
-    contact = Column(Text)  # Stockage des infos de contact (email/nom)
-    raw_json = Column(Text)  # JSON brut de l'offre pour conserver toutes les infos
+    url = Column(String(500), unique=True, nullable=True, index=True)
+    source = Column(
+        String(50), nullable=False, index=True
+    )  # 'Welcome to the Jungle', 'HelloWork', 'France Travail'
 
-    # Métadonnées pour le tracking
-    source = Column(String(50))  # 'france_travail' ou 'web_scraping'
-    url = Column(String(500), unique=True)  # Pour éviter les doublons
-    created_at = Column(DateTime, server_default=func.now())
+    # ===== DATES =====
+    date_publication = Column(DateTime)  # Date de parution de l'offre
+    date_scraping = Column(
+        DateTime, server_default=func.now()
+    )  # Date de scraping/insertion (par le système)
 
-    # La colonne embedding : vecteur de 384 dimensions
-    # taille standard pour le modèle all-MiniLM-L6-v2
+    # ===== POSTE =====
+    title = Column(String(255), nullable=False, index=True)
+    sector = Column(String(255))  # Secteur d'activité
+    contract_type = Column(String(100))  # CDI, CDD, Stage, Alternance, etc.
+    remote_mode = Column(String(100))  # Télétravail total, occasionnel, etc.
+    salary = Column(
+        String(255)
+    )  # "20K €", "Annuel de 40000 Euros", "Mensuel de 810.0 Euros à 1801.0 Euros sur 12.0 mois", etc.
+
+    # ===== LOCALISATION =====
+    city = Column(String(100), index=True)  # Ville
+    department = Column(String(50))  # Département (ex: "Hauts-de-Seine" ou "Loire-Atlantique")
+    region = Column(String(100))  # Région
+
+    # ===== ENTREPRISE =====
+    company = Column(String(255), index=True)
+    company_size = Column(
+        String(500)
+    )  # "22000 collaborateurs", "0 salarié (n'ayant pas d'effectif au 31/12...)", etc.
+
+    # ===== PROFIL DEMANDÉ =====
+    required_experience = Column(String(255))  # "< 6 mois", "5 ans", etc.
+    required_education = Column(String(255))  # "Bac +5 / Master", "Bac +3", etc.
+    competences = Column(Text)  # Comma-separated skills list
+    soft_skills = Column(Text)  # France Travail: "Esprit d'équipe, Rigueur"
+    languages = Column(String(255))  # France Travail: "Anglais, Français"
+
+    # ===== CONTENU TEXTUEL =====
+    description = Column(Text, nullable=False)  # Description complète du poste
+    job_profile = Column(Text)  # Profil demandé / Qualifications
+
+    # ===== VECTEUR D'EMBEDDING =====
+    # 384 dimensions pour le modèle all-MiniLM-L6-v2
     embedding = Column(Vector(384))
 
+    # ===== PROPRIÉTÉS CALCULÉES (pour compatibilité API) =====
+    @property
+    def created_at(self) -> datetime | None:
+        """Alias de date_scraping pour compatibilité API."""
+        return self.date_scraping  # type: ignore[return-value]
+
+    @property
+    def location(self) -> str | None:
+        """Construit une chaîne de localisation à partir de city, department, region."""
+        parts: list[str] = [
+            str(p).strip() for p in [self.city, self.department, self.region] if p
+        ]
+        return " - ".join(parts) if parts else None
+
     def __repr__(self):
-        return f"<JobOffer(title='{self.title}', company='{self.company}')>"
+        return f"<JobOffer(id={self.id}, title='{self.title}', company='{self.company}', source='{self.source}')>"

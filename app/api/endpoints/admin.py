@@ -3,20 +3,19 @@ Endpoints admin protégés par API key.
 Collecte de données et maintenance.
 """
 
-from typing import List
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from loguru import logger
 
-from app.schemas.common import MessageResponse
+from app.schemas.common import MessageResponse, CollectRequest
 from app.api.deps import get_db
 from app.core.security import verify_api_key
 from app.core.exceptions import DatabaseError
 from app.utils import run_in_thread
 
 # Import des services
-from src.services.collector import run_collector
+from src.services.france_travail_collector import run_collector
 from src.services.processor import process_embeddings
 from src.services.scrappe_hw import run_hw_scraper
 from src.services.scrappe_wttj import run_wttj_scraper
@@ -34,9 +33,7 @@ router = APIRouter()
     status_code=202,
 )
 async def collect_jobs(
-    keywords: List[str],
-    max_offers: int = 10,
-    enable_scraping: bool = True,
+    request: CollectRequest,
     background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
     api_key: str = Depends(verify_api_key),
@@ -67,9 +64,7 @@ async def collect_jobs(
     ```
     
     Args:
-        keywords: Liste de mots-clés pour la recherche
-        max_offers: Nombre max d'offres par mot-clé (défaut: 10)
-        enable_scraping: Activer le scraping web (défaut: true)
+        request: Requête de collecte (keywords, max_offers, enable_scraping)
         background_tasks: Tâches en arrière-plan (injecté)
         db: Session DB (injecté)
         api_key: API key validée (injecté)
@@ -78,7 +73,7 @@ async def collect_jobs(
         MessageResponse: Confirmation de lancement
     """
 
-    if not keywords:
+    if not request.keywords:
         return MessageResponse(
             message="Liste de mots-clés vide, aucune collecte lancée.",
             success=False,
@@ -90,31 +85,31 @@ async def collect_jobs(
         try:
             # API France Travail
             logger.info("Collecte API France Travail...")
-            await run_in_thread(run_collector, keywords, max_offers)
+            await run_in_thread(run_collector, request.keywords, request.max_offers)
 
             # Scraping HelloWork : optionnel
-            if enable_scraping:
+            if request.enable_scraping:
                 logger.info(
-                    f"Démarrage scraping HelloWork ({max_offers} offres/mot-clé)..."
+                    f"Démarrage scraping HelloWork ({request.max_offers} offres/mot-clé)..."
                 )
                 await run_in_thread(
                     run_hw_scraper,
-                    keywords_to_fetch=keywords,
-                    max_offres_per_kw=max_offers,
+                    keywords_to_fetch=request.keywords,
+                    max_offres_per_kw=request.max_offers,
                     save_to_db=True,
                     headless=True,
                 )
                 logger.success(" Scraping HelloWork terminé")
 
             # Scraping Welcome to the Jungle : optionnel
-            if enable_scraping:
+            if request.enable_scraping:
                 logger.info(
-                    f" Démarrage scraping Welcome to the Jungle ({max_offers} offres/mot-clé)..."
+                    f" Démarrage scraping Welcome to the Jungle ({request.max_offers} offres/mot-clé)..."
                 )
                 await run_in_thread(
                     run_wttj_scraper,
-                    keywords_to_fetch=keywords,
-                    max_offres_per_kw=max_offers,
+                    keywords_to_fetch=request.keywords,
+                    max_offres_per_kw=request.max_offers,
                     save_to_db=True,
                     headless=True,
                 )
@@ -137,12 +132,12 @@ async def collect_jobs(
         await run_collection()
 
     return MessageResponse(
-        message=f"Collecte lancée pour {len(keywords)} mot(s)-clé(s).",
+        message=f"Collecte lancée pour {len(request.keywords)} mot(s)-clé(s).",
         success=True,
         data={
-            "keywords": keywords,
-            "max_offers_per_keyword": max_offers,
-            "scraping_enabled": enable_scraping,
+            "keywords": request.keywords,
+            "max_offers_per_keyword": request.max_offers,
+            "scraping_enabled": request.enable_scraping,
         },
     )
 
@@ -248,23 +243,22 @@ async def get_stats(
         sources_stats = {source: count for source, count in by_source}
 
         # Offres avec/sans embeddings
+        # Note: avec pgvector, on vérifie si le vecteur n'est pas NULL
         with_embeddings = (
-            db.query(JobOffer).filter(JobOffer.embedding.isnot(None)).count()
+            db.query(JobOffer).filter(JobOffer.embedding.is_not(None)).count()
         )
         without_embeddings = total_jobs - with_embeddings
 
-        # Offre la plus récente
-        latest_job = (
-            db.query(JobOffer).order_by(JobOffer.actualisation_date.desc()).first()
-        )
+        # Offre la plus récente (basée on date_scraping = date d'insertion)
+        latest_job = db.query(JobOffer).order_by(JobOffer.date_scraping.desc()).first()
 
         latest_job_info = None
         if latest_job:
             latest_job_info = {
                 "title": latest_job.title,
                 "company": latest_job.company,
-                "date": latest_job.actualisation_date.isoformat()
-                if latest_job.actualisation_date
+                "date": latest_job.date_scraping.isoformat()
+                if latest_job.date_scraping
                 else None,
             }
 
