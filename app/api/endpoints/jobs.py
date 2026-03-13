@@ -305,7 +305,7 @@ async def get_jobs(
             required_education=str(job.required_education)
             if job.required_education
             else None,
-            competences=str(job.competences) if job.competences else None,
+            hard_skills=str(job.hard_skills) if job.hard_skills else None,
             soft_skills=str(job.soft_skills) if job.soft_skills else None,
             languages=str(job.languages) if job.languages else None,
             # ===== CONTENU TEXTUEL =====
@@ -409,7 +409,7 @@ async def get_job_details(job_id: str, db: Session = Depends(get_db)):
         required_education=str(job.required_education)
         if job.required_education
         else None,
-        competences=str(job.competences) if job.competences else None,
+        hard_skills=str(job.hard_skills) if job.hard_skills else None,
         soft_skills=str(job.soft_skills) if job.soft_skills else None,
         languages=str(job.languages) if job.languages else None,
         # ===== CONTENU TEXTUEL =====

@@ -405,7 +405,7 @@ def save_offers_to_db(db_session, offers: list, source_name: str = "Scraping") -
 
     Gère automatiquement le mapping entre les champs des scrapers et le modèle BD.
     Tous les champs nouveaux sont maintenant supportés: sector, remote_mode, salary,
-    languages, soft_skills, competences, etc.
+    languages, soft_skills, hard_skills, etc.
 
     Vérifie automatiquement les doublons avant insertion pour éviter les violations
     de contraintes d'unicité.
@@ -477,7 +477,7 @@ def save_offers_to_db(db_session, offers: list, source_name: str = "Scraping") -
                 # ===== PROFIL DEMANDÉ =====
                 required_experience=offer_data.get("required_experience"),
                 required_education=offer_data.get("required_education"),
-                competences=offer_data.get("competences"),
+                hard_skills=offer_data.get("hard_skills"),
                 # ===== RÉMUNÉRATION =====
                 salary=offer_data.get("salary"),
                 # ===== CONTENU TEXTUEL =====

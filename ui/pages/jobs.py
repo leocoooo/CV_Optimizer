@@ -211,20 +211,20 @@ def render(api_client: APIClient, api_status: bool):
 
                             # Compétences et langues
                             if (
-                                job.get("competences")
+                                job.get("hard_skills")
                                 or job.get("soft_skills")
                                 or job.get("languages")
                             ):
                                 col1, col2, col3 = st.columns(3)
 
                                 with col1:
-                                    if job.get("competences"):
+                                    if job.get("hard_skills"):
                                         st.markdown("**🔧 Compétences techniques**")
                                         st.caption(
-                                            job["competences"][:200]
+                                            job["hard_skills"][:200]
                                             + (
                                                 "..."
-                                                if len(job.get("competences", "")) > 200
+                                                if len(job.get("hard_skills", "")) > 200
                                                 else ""
                                             )
                                         )

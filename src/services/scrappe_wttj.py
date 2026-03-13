@@ -544,8 +544,8 @@ def scrape_wttj_json_strategy(
                         except Exception:
                             pass
 
-                        # Competences requises - extract from dedicated section
-                        raw_data["competences"] = None
+                        # Competences techniques requises - extract from dedicated section
+                        raw_data["hard_skills"] = None
                         try:
                             # Find the skills section with the specific div structure
                             # Look for divs with length attribute and variant="default" containing skill spans
@@ -580,14 +580,14 @@ def scrape_wttj_json_strategy(
                                     pass
 
                             if skills and len(skills) >= 2:
-                                raw_data["competences"] = ", ".join(
+                                raw_data["hard_skills"] = ", ".join(
                                     skills[:8]
                                 )  # Limit to 8 skills
                                 logger.debug(
-                                    f"Competences found: {raw_data['competences']}"
+                                    f"Hard skills found: {raw_data['hard_skills']}"
                                 )
                         except Exception as e:
-                            logger.debug(f"Competences extraction failed: {e}")
+                            logger.debug(f"Hard skills extraction failed: {e}")
 
                         # ===== RÉMUNÉRATION & AVANTAGES =====
                         # Prendre le salaire SEULEMENT s'il y a un tag "Salaire :"
@@ -777,7 +777,7 @@ def scrape_wttj_json_strategy(
                             # PROFIL DEMANDÉ
                             "required_experience": raw_data.get("required_experience"),
                             "required_education": raw_data.get("required_education"),
-                            "competences": raw_data.get("competences"),
+                            "hard_skills": raw_data.get("hard_skills"),
                             # RÉMUNÉRATION & AVANTAGES
                             "salary": raw_data.get("salary"),
                             # CONTENU

@@ -91,7 +91,7 @@ class JobResponse(BaseModel):
     # ===== PROFIL DEMANDÉ =====
     required_experience: Optional[str] = Field(None, description="Expérience requise")
     required_education: Optional[str] = Field(None, description="Niveau d'étude requis")
-    competences: Optional[str] = Field(
+    hard_skills: Optional[str] = Field(
         None, description="Compétences requises (comma-separated)"
     )
     soft_skills: Optional[str] = Field(

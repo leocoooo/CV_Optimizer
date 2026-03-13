@@ -426,8 +426,8 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                         raw_data["job_profile"] = job_profile if job_profile else None
 
                         # ===== COMPÉTENCES =====
-                        # Note: job_profile contient le profil complet, competences reste None
-                        raw_data["competences"] = None
+                        # Note: job_profile contient le profil complet, hard_skills reste None
+                        raw_data["hard_skills"] = None
 
                         # ===== DATE DE PUBLICATION =====
                         raw_data["date_publication"] = None
@@ -584,7 +584,7 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             # PROFIL DEMANDÉ
                             "required_experience": raw_data.get("required_experience"),
                             "required_education": raw_data.get("required_education"),
-                            "competences": raw_data.get("competences"),
+                            "hard_skills": raw_data.get("hard_skills"),
                             # RÉMUNÉRATION & AVANTAGES
                             "salary": raw_data.get("salary"),
                             # CONTENU

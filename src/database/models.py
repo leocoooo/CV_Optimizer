@@ -36,7 +36,9 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
 
     # ===== LOCALISATION =====
     city = Column(String(100), index=True)  # Ville
-    department = Column(String(50))  # Département (ex: "Hauts-de-Seine" ou "Loire-Atlantique")
+    department = Column(
+        String(50)
+    )  # Département (ex: "Hauts-de-Seine" ou "Loire-Atlantique")
     region = Column(String(100))  # Région
 
     # ===== ENTREPRISE =====
@@ -48,7 +50,7 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     # ===== PROFIL DEMANDÉ =====
     required_experience = Column(String(255))  # "< 6 mois", "5 ans", etc.
     required_education = Column(String(255))  # "Bac +5 / Master", "Bac +3", etc.
-    competences = Column(Text)  # Comma-separated skills list
+    hard_skills = Column(Text)  # Comma-separated skills list
     soft_skills = Column(Text)  # France Travail: "Esprit d'équipe, Rigueur"
     languages = Column(String(255))  # France Travail: "Anglais, Français"
 

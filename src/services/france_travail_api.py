@@ -435,8 +435,8 @@ def convert_ft_offer(offer: dict, ft_api: "FranceTravailAPI | None" = None) -> d
     salary = salary_info.get("libelle") if isinstance(salary_info, dict) else None
 
     # Compétences techniques/métier
-    competences = None
-    comp_list = offer.get("competences", [])
+    hard_skills = None
+    comp_list = offer.get("hard_skills", [])
     if comp_list:
         comp_texts = [
             comp.get("libelle")
@@ -444,7 +444,7 @@ def convert_ft_offer(offer: dict, ft_api: "FranceTravailAPI | None" = None) -> d
             if isinstance(comp, dict) and comp.get("libelle")
         ]
         if comp_texts:
-            competences = ", ".join(
+            hard_skills = ", ".join(
                 str(text) for text in comp_texts[:10] if text
             )  # Limiter à 10
 
@@ -501,7 +501,7 @@ def convert_ft_offer(offer: dict, ft_api: "FranceTravailAPI | None" = None) -> d
         # PROFIL DEMANDÉ
         "required_experience": required_experience,
         "required_education": required_education,  # Maintenant récupéré de FT
-        "competences": competences,  # Techniques/métier
+        "hard_skills": hard_skills,  # Techniques/metier
         # RÉMUNÉRATION
         "salary": salary,
         # CONTENU
