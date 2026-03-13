@@ -875,4 +875,4 @@ if __name__ == "__main__":
     )
 
     print(f"\nRésultat : {len(offers)} offre(s) traité(es)")
-    print(offers[0] if offers else "Aucune offre trouvée")
+    # print(offers[0] if offers else "Aucune offre trouvée")
