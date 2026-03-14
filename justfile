@@ -1,6 +1,9 @@
 # CV Optimizer - Justfile
 # Commands for development, testing, and deployment
 
+# Import .env variables
+set dotenv-load := true
+
 # Default recipe - show help
 default:
     @just --list
@@ -133,35 +136,14 @@ dev-full: docker-up collect-all process
 # DATABASE - Direct management (requires psql)
 # ============================================================================
 
-# Connect to AWS RDS PostgreSQL (production)
+# Transform DATABASE_URL for psql (handle special characters)
+db_url := env_var("DATABASE_URL")
+
+# Connect to AWS RDS
 db-connect:
-    psql -h joboffers-db.cbas48y2g22e.eu-west-3.rds.amazonaws.com -U postgres -d cv_optimizer
-
-# Truncate job offers table (keeps structure)
-db-truncate:
-    docker exec -i cv-optimizer-db-1 psql -U admin -d job_db -c "TRUNCATE TABLE job_offers;"
-
-# Drop job offers table
-db-drop:
-    docker exec -i cv-optimizer-db-1 psql -U admin -d job_db -c "DROP TABLE job_offers;"
+    psql -d "{{db_url}}"
 
 # Count rows in job_offers
 db-count:
-    docker exec -i cv-optimizer-db-1 psql -U admin -d job_db -c "SELECT COUNT(*) as total_offers FROM job_offers;"
+    psql -d "{{db_url}}" -c "SELECT COUNT(*) as total_offers FROM job_offers;"
 
-# ============================================================================
-# NOTES
-# ============================================================================
-# Database environment
-# - Current: AWS RDS PostgreSQL (cv_optimizer)
-# - pgvector extension: Enabled for embeddings (384 dimensions)
-# - RDS Endpoint: joboffers-db.cbas48y2g22e.eu-west-3.rds.amazonaws.com
-# - Never commit .env file (contains credentials)
-#
-# Usage examples:
-#   just test data/CVs/CV.pdf "Data Scientist"
-#   just full data/CVs/CV.pdf "Data Engineer" 
-#   just backend
-#   just frontend
-#   just collect-all
-#   just check-all
