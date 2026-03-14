@@ -436,7 +436,7 @@ def convert_ft_offer(offer: dict, ft_api: "FranceTravailAPI | None" = None) -> d
 
     # Compétences techniques/métier
     hard_skills = None
-    comp_list = offer.get("hard_skills", [])
+    comp_list = offer.get("competences", [])
     if comp_list:
         comp_texts = [
             comp.get("libelle")
