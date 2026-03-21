@@ -115,5 +115,17 @@ def run_collector(keywords_to_fetch, max_offers=50):
 
 
 if __name__ == "__main__":
-    keywords_to_fetch = ["Data Scientist"]
-    run_collector(keywords_to_fetch, 10)
+    keywords_to_test = [
+        "Data scientist",
+        "Data engineer",
+        "Data Analyst",
+        "Developpeur Python",
+        "Developpeur frontend",
+        "Developpeur backend",
+        "Developpeur fullstack",
+        "LLM",
+        "GenAI",
+        "Machine Learning Engineer",
+        "Ingénieur IA",
+    ]
+    run_collector(keywords_to_test, 10)

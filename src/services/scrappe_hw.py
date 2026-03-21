@@ -355,13 +355,14 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
 
                         # ===== CONTENU (AVANT de changer d'onglet) =====
                         # Description principale - EXTRAIRE AVANT de cliquer sur L'entreprise
+                        # Cherche SOIT "Les missions du poste" SOIT "Détail du poste"
                         description_text = ""
                         try:
                             # Essayer de cliquer sur "Voir plus" si le bouton existe
                             try:
                                 show_more_btn = driver.find_element(
                                     By.XPATH,
-                                    "//button[contains(text(), 'Voir plus') and ancestor::section]",
+                                    "//button[contains(text(), 'Voir plus')]",
                                 )
                                 driver.execute_script(
                                     "arguments[0].click();", show_more_btn
@@ -370,18 +371,28 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             except Exception:
                                 pass
 
-                            # Extraire la description
-                            desc_elements = driver.find_elements(
+                            # Extraire la description: chercher le div avec data-truncate-text-target='content'
+                            content_div = driver.find_element(
                                 By.XPATH,
-                                "//div[@data-truncate-text-target='content']//p | //section//div[@class]//p[contains(@class, 'tw-typo-long-m')]",
+                                "//div[@data-truncate-text-target='content']",
                             )
-                            if desc_elements:
-                                description_text = desc_elements[0].text.strip()
-                        except Exception:
+                            # Extraire tout le texte du div (inclut les paragraphes, listes, etc.)
+                            description_text = content_div.text.strip()
+                            if not description_text:
+                                # Si vide, essayer d'extraire les paragraphes manuellement
+                                paragraphs = content_div.find_elements(By.TAG_NAME, "p")
+                                non_empty_texts = []
+                                for p in paragraphs:
+                                    text = p.text.strip()
+                                    if text:
+                                        non_empty_texts.append(text)
+                                if non_empty_texts:
+                                    description_text = "\n".join(non_empty_texts)
+                        except Exception as e:
+                            logger.debug(f"Erreur extraction description: {e}")
                             pass
 
-                        # Missions et profil
-                        job_mission = ""
+                        # Profil
                         job_profile = ""
 
                         # Extraction des sections "Le profil recherché" - format BUTTON (ancien)
@@ -412,17 +423,29 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                                 driver.execute_script("arguments[0].click();", summary)
                                 time.sleep(0.5)
 
-                                # Extraire le contenu du profil
-                                profil_content = profile_details.find_element(
-                                    By.CSS_SELECTOR, "p.tw-typo-long-m"
+                                # Extraire le contenu du profil: chercher le div avec tw-typo-long-m tw-break-words
+                                # Extraire tout le texte du div (inclut paragraphes, listes, etc.)
+                                profil_div = profile_details.find_element(
+                                    By.CSS_SELECTOR, "div.tw-typo-long-m.tw-break-words"
                                 )
-                                job_profile = profil_content.text
+                                job_profile = profil_div.text.strip()
+                                if not job_profile:
+                                    # Fallback: si vide, essayer d'extraire les paragraphes
+                                    paragraphs = profil_div.find_elements(
+                                        By.TAG_NAME, "p"
+                                    )
+                                    non_empty_texts = []
+                                    for p in paragraphs:
+                                        text = p.text.strip()
+                                        if text:
+                                            non_empty_texts.append(text)
+                                    if non_empty_texts:
+                                        job_profile = "\n".join(non_empty_texts)
                             except Exception:
                                 pass
 
                         # Agrégation de la description
                         raw_data["description"] = description_text
-                        raw_data["job_mission"] = job_mission if job_mission else None
                         raw_data["job_profile"] = job_profile if job_profile else None
 
                         # ===== COMPÉTENCES =====
@@ -539,23 +562,11 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             pass
 
                         # ========== CONSTRUCTION DE LA ROW FINALE ==========
-                        # Merge job_mission into job_profile for unified output
                         job_profile_text = clean_description(
                             raw_data.get("job_profile", "")
                         )
-                        job_mission_text = clean_description(
-                            raw_data.get("job_mission", "")
-                        )
 
-                        # Combine job_profile and job_mission (if both exist)
-                        if job_mission_text and job_profile_text:
-                            combined_profile = (
-                                f"{job_mission_text}\n\n{job_profile_text}"
-                            )
-                        elif job_mission_text:
-                            combined_profile = job_mission_text
-                        else:
-                            combined_profile = job_profile_text
+                        description = clean_description(raw_data.get("description"))
 
                         # Parse location format "Ville - Code" to extract city, department, region
                         location_parsed = parse_location_hellowork(
@@ -588,10 +599,10 @@ def scrape_hellowork(keywords, max_offres_per_kw=10, db_session=None, headless=N
                             # RÉMUNÉRATION & AVANTAGES
                             "salary": raw_data.get("salary"),
                             # CONTENU
-                            "description": clean_description(
-                                raw_data.get("description")
-                            ),
-                            "job_profile": combined_profile,
+                            "description": description if description else None,
+                            "job_profile": job_profile_text
+                            if job_profile_text
+                            else None,
                         }
 
                         all_data.append(row)
@@ -686,10 +697,21 @@ def run_hw_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["Data Scientist"]
+    keywords_to_test = [
+        "Data scientist",
+        "Data engineer",
+        "Data Analyst",
+        "Developpeur Python",
+        "Developpeur frontend",
+        "Developpeur backend",
+        "Developpeur fullstack",
+        "LLM",
+        "GenAI",
+        "Machine Learning Engineer",
+        "Ingénieur IA",
+    ]
     offers = run_hw_scraper(
         keywords_to_test, max_offres_per_kw=10, save_to_db=True, headless=True
     )
 
     print(f"\nRésultat : {len(offers)} offre(s) traité(es)")
-    print(offers[0] if offers else "Aucune offre trouvée")
