@@ -12,3 +12,5 @@ data/.DS_Store
 .ruff_cache/
 .idea/
 .DS_Store
+
+notebooks/
