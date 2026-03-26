@@ -181,7 +181,9 @@ async def match_cv(
             match = JobMatch(
                 job_id=row.id,
                 title=row.title,
-                company=row.company,
+                company=row.company
+                if hasattr(row, "company") and row.company
+                else None,
                 location=row.location if hasattr(row, "location") else None,
                 contract_type=row.contract_type
                 if hasattr(row, "contract_type")

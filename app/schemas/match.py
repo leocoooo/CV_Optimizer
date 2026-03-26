@@ -12,7 +12,7 @@ class JobMatch(BaseModel):
 
     job_id: str = Field(..., description="Identifiant unique de l'offre")
     title: str = Field(..., description="Titre du poste")
-    company: str = Field(..., description="Nom de l'entreprise")
+    company: Optional[str] = Field(None, description="Nom de l'entreprise")
     location: Optional[str] = Field(
         None, description="Localisation (composée de city, department, region)"
     )

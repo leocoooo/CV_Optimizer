@@ -103,12 +103,14 @@ def render(api_client: APIClient, api_status: bool):
                             score_label = "Moyen"
 
                         with st.expander(
-                            f"{score_emoji} #{i} - {match['title']} - {match['company']} ({match['similarity_score']:.1%})",
+                            f"{score_emoji} #{i} - {match['title']} - {match['company'] or 'N/A'} ({match['similarity_score']:.1%})",
                             expanded=(i <= 3),
                         ):
                             # Sanitize user-provided content to prevent XSS
-                            safe_title = html.escape(match["title"])
-                            safe_company = html.escape(match["company"])
+                            safe_title = html.escape(match["title"] or "")
+                            safe_company = html.escape(
+                                match["company"] or "Non disponible"
+                            )
 
                             st.markdown(
                                 f"""

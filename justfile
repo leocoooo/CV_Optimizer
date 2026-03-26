@@ -147,3 +147,5 @@ db-connect:
 db-count:
     psql -d "{{db_url}}" -c "SELECT COUNT(*) as total_offers FROM job_offers;"
 
+db-sample:
+    psql -d "{{db_url}}" -c "SELECT id, title, source FROM job_offers LIMIT 10;"
