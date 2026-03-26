@@ -755,6 +755,10 @@ def scrape_wttj_json_strategy(
                         )
 
                         # ========== CONSTRUCTION DE LA ROW FINALE ==========
+                        description = clean_description(raw_data.get("description"))
+
+                        job_profile = clean_description(raw_data.get("job_profile"))
+
                         row = {
                             # IDENTIFIANTS
                             "id": job_id,
@@ -781,12 +785,8 @@ def scrape_wttj_json_strategy(
                             # RÉMUNÉRATION & AVANTAGES
                             "salary": raw_data.get("salary"),
                             # CONTENU
-                            "description": clean_description(
-                                raw_data.get("description")
-                            ),
-                            "job_profile": clean_description(
-                                raw_data.get("job_profile")
-                            ),
+                            "description": description if description else None,
+                            "job_profile": job_profile if job_profile else None,
                         }
 
                         all_data.append(row)
@@ -869,7 +869,19 @@ def run_wttj_scraper(
 if __name__ == "__main__":
     # Test avec insertion en base de données
     # headless=False permet de voir le navigateur en action
-    keywords_to_test = ["Data scientist", "Data engineer", "Data Analyst"]
+    keywords_to_test = [
+        "Data scientist",
+        "Data engineer",
+        "Data Analyst",
+        "Developpeur Python",
+        "Developpeur frontend",
+        "Developpeur backend",
+        "Developpeur fullstack",
+        "LLM",
+        "GenAI",
+        "Machine Learning Engineer",
+        "Ingénieur IA",
+    ]
     offers = run_wttj_scraper(
         keywords_to_test, max_offres_per_kw=10, save_to_db=True, headless=True
     )
