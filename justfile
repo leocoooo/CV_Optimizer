@@ -76,6 +76,9 @@ read-cv:
 advise:
     uv run python -m src.services.llm_advisor
 
+homogenize-db:
+    uv run python -m src.services.homogenize_database
+
 # ============================================================================
 # API & UI SERVICES
 # ============================================================================

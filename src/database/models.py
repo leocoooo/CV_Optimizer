@@ -62,6 +62,21 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     # 384 dimensions pour le modèle all-MiniLM-L6-v2
     embedding = Column(Vector(384))
 
+    # ===== COLONNES HOMOGÉNÉISÉES =====
+    cleaned_title = Column(String(255), nullable=True)  # Titre homogénéisé
+    cleaned_contract_type = Column(
+        String(100), nullable=True
+    )  # Type de contrat homogénéisé
+    cleaned_remote_mode = Column(
+        String(100), nullable=True
+    )  # Mode télétravail homogénéisé
+    cleaned_required_experience = Column(
+        String(50), nullable=True
+    )  # Expérience requise homogénéisée
+    cleaned_required_education = Column(
+        String(100), nullable=True
+    )  # Éducation requise homogénéisée
+
     # ===== PROPRIÉTÉS CALCULÉES (pour compatibilité API) =====
     @property
     def created_at(self) -> datetime | None:
