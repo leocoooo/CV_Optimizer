@@ -295,19 +295,19 @@ def column_exists(table_name: str, column_name: str) -> bool:
 def create_cleaned_columns():
     """Crée les colonnes cleaned_* s'elles n'existent pas."""
     cleaned_columns = [
-        "cleaned_title",
-        "cleaned_contract_type",
-        "cleaned_remote_mode",
-        "cleaned_required_experience",
-        "cleaned_required_education",
+        ("cleaned_title", "VARCHAR(255)"),
+        ("cleaned_contract_type", "VARCHAR(100)"),
+        ("cleaned_remote_mode", "VARCHAR(100)"),
+        ("cleaned_required_experience", "VARCHAR(50)"),
+        ("cleaned_required_education", "VARCHAR(100)"),
     ]
 
     with engine.connect() as connection:
-        for col_name in cleaned_columns:
+        for col_name, col_type in cleaned_columns:
             if not column_exists("job_offers", col_name):
-                logger.info(f"Creating column {col_name}...")
+                logger.info(f"Creating column {col_name} ({col_type})...")
                 alter_query = text(
-                    f"ALTER TABLE job_offers ADD COLUMN {col_name} VARCHAR(255) DEFAULT NULL;"
+                    f"ALTER TABLE job_offers ADD COLUMN {col_name} {col_type} DEFAULT NULL;"
                 )
                 connection.execute(alter_query)
                 connection.commit()

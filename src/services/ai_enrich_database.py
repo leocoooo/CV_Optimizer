@@ -27,15 +27,6 @@ from src.database.database import engine, SessionLocal
 from src.services.processor import build_content_to_vectorize
 from app.config import get_settings
 
-# Télécharger les modèles NLTK pour tokenization
-try:
-    nltk.data.find("tokenizers/punkt_tab")
-except LookupError:
-    logger.info("Downloading NLTK punkt_tab...")
-    nltk.download("punkt_tab", quiet=True)
-    logger.info("NLTK punkt_tab downloaded")
-
-
 # ===== CONFIGURATION =====
 settings = get_settings()
 
@@ -43,14 +34,6 @@ settings = get_settings()
 BASE_DIR = Path(__file__).parent.parent.parent  # retourner à la racine
 MODEL_NER = BASE_DIR / "models" / "ner"
 MODEL_CLASSIFIER = BASE_DIR / "models" / "classifier"
-
-# Vérifier que les modèles existent
-if not MODEL_NER.exists():
-    raise FileNotFoundError(f"Modèle NER non trouvé: {MODEL_NER}")
-if not MODEL_CLASSIFIER.exists():
-    raise FileNotFoundError(f"Modèle Classifier non trouvé: {MODEL_CLASSIFIER}")
-
-logger.info(f"Modèles locaux: NER={MODEL_NER}, Classifier={MODEL_CLASSIFIER}")
 
 # Configuration
 BATCH_SIZE = 16
@@ -104,14 +87,35 @@ _class_pipe = None
 
 # ===== INITIALISATION =====
 def initialize_pipelines():
-    """Charge les modèles HuggingFace une seule fois au démarrage."""
+    """
+    Charge les modèles HuggingFace une seule fois au démarrage.
+    Télécharge aussi les ressources NLTK et vérifie la présence des modèles locaux.
+    """
     global _ner_pipe, _class_pipe
 
     if _ner_pipe is not None and _class_pipe is not None:
         logger.info("Pipelines déjà chargés")
         return _ner_pipe, _class_pipe
 
-    logger.info("Chargement des modèles HuggingFace...")
+    logger.info("Initialisation des ressources (NLTK + modèles)...")
+
+    # Télécharger les modèles NLTK pour tokenization
+    try:
+        nltk.data.find("tokenizers/punkt_tab")
+    except LookupError:
+        logger.info("Downloading NLTK punkt_tab...")
+        nltk.download("punkt_tab", quiet=True)
+        logger.info("NLTK punkt_tab downloaded")
+
+    # Vérifier que les modèles existent
+    if not MODEL_NER.exists():
+        raise FileNotFoundError(f"Modèle NER non trouvé: {MODEL_NER}")
+    if not MODEL_CLASSIFIER.exists():
+        raise FileNotFoundError(f"Modèle Classifier non trouvé: {MODEL_CLASSIFIER}")
+
+    logger.info(f"Modèles locaux: NER={MODEL_NER}, Classifier={MODEL_CLASSIFIER}")
+
+    logger.info("Chargement des pipelines HuggingFace...")
 
     try:
         # Charger le modèle NER
@@ -371,6 +375,7 @@ def create_ai_columns():
                     "ai_hard_skills",
                     "ai_soft_skills",
                     "ai_missions",
+                    "ai_remote_phrase",
                 ]:
                     col_type = "TEXT"
                 elif col_name == "ai_enrichment_date":

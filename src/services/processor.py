@@ -116,6 +116,9 @@ def process_embeddings(regenerate_content: bool = False):
                     f"Offre {offer.id} : aucun contenu pour vectoriser "
                     "(title, ai_hard_skills, ai_sector, ai_missions, ai_soft_skills, job_profile tous vides)"
                 )
+                # En mode reindex, effacer aussi l'embedding stale pour garder la cohérence
+                if regenerate_content:
+                    setattr(offer, "embedding", None)
 
             # Log de progression tous les 50 éléments
             if (index + 1) % 50 == 0:

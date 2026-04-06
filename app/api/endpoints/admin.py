@@ -20,7 +20,6 @@ from src.services.processor import process_embeddings
 from src.services.scrappe_hw import run_hw_scraper
 from src.services.scrappe_wttj import run_wttj_scraper
 from src.services.homogenize_database import run_homogenization
-from src.services.ai_enrich_database import run_ai_enrichment
 from src.database.models import JobOffer
 
 router = APIRouter()
@@ -129,6 +128,9 @@ async def collect_jobs(
             # === ENRICHISSEMENT IA ===
             logger.info(" Enrichissement IA (NER + Classification → colonnes ai_*)...")
             # Enrichir SEULEMENT les offres collectées dans les 15 dernières minutes
+            # Lazy import pour éviter les effets de bord au démarrage de l'API
+            from src.services.ai_enrich_database import run_ai_enrichment
+
             await run_in_thread(
                 run_ai_enrichment, force_reprocess=False, only_recent_minutes=15
             )

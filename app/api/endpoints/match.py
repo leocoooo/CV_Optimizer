@@ -66,17 +66,14 @@ async def match_cv(
     **Filtres optionnels** :
     - location : "Paris", "Lyon", "Remote", etc.
     - contract_type : "CDI", "CDD", "Stage", "Alternance"
-    - experience : "D" (Débutant), "E" (Expérimenté), "S" (Senior)
+    - experience : "Junior", "Intermédiaire", "Expérimenté"
     - days_limit : Limiter aux offres des N derniers jours (défaut: 30)
     - top_n : Nombre de résultats à retourner (1-50, défaut: 10)
     
     **Exemple d'utilisation** :
     ```bash
-    curl -X POST "http://localhost:8000/api/match" \\
-      -F "file=@mon_cv.pdf" \\
-      -F "location=Paris" \\
-      -F "contract_type=CDI" \\
-      -F "top_n=10"
+    curl -X POST "http://localhost:8000/api/match?location=Paris&contract_type=CDI&experience=Junior&top_n=10" \\
+      -F "file=@mon_cv.pdf"
     ```
     
     Args:
@@ -258,7 +255,7 @@ async def get_filter_options(db: Session = Depends(get_db)):
     ```json
     {
         "contract_types": ["CDI", "CDD", "Stage"],
-        "experience_levels": ["Débutant", "Expérimenté", "Senior"],
+        "experience_levels": ["Junior", "Intermédiaire", "Expérimenté"],
         "locations": {
             "cities": ["Paris", "Lyon", "Marseille"],
             "departments": ["Île-de-France", "Rhône"],

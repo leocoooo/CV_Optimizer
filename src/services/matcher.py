@@ -80,8 +80,14 @@ class JobMatcher:
             job_offers.date_publication >= :limit_date
             OR (job_offers.date_publication IS NULL AND job_offers.date_scraping >= :limit_date)
         )
-        AND (:contract_type IS NULL OR job_offers.cleaned_contract_type = :contract_type)
-        AND (:experience IS NULL OR job_offers.cleaned_required_experience ILIKE '%' || :experience || '%')
+        AND (
+            :contract_type IS NULL
+            OR COALESCE(job_offers.cleaned_contract_type, job_offers.contract_type) = :contract_type
+        )
+        AND (
+            :experience IS NULL
+            OR COALESCE(job_offers.cleaned_required_experience, job_offers.required_experience) ILIKE '%' || :experience || '%'
+        )
         AND job_offers.embedding IS NOT NULL
         ORDER BY similarity_score DESC NULLS LAST
         LIMIT :top_n
