@@ -76,6 +76,65 @@ read-cv:
 advise:
     uv run python -m src.services.llm_advisor
 
+homogenize-db:
+    uv run python -m src.services.homogenize_database
+
+# ============================================================================
+# AI ENRICHMENT - Deep Learning models for data extraction
+# ============================================================================
+
+# Enrich all job offers with NER and Classification models
+enrich-ai:
+    uv run python -m src.services.ai_enrich_database
+
+# Enrich single job offer (requires job_id parameter)
+enrich-ai-test job_id:
+    uv run python -m src.services.ai_enrich_database --test-id {{job_id}}
+
+# Re-enrich single job offer (force reprocessing)
+enrich-ai-test-force job_id:
+    uv run python -m src.services.ai_enrich_database --test-id {{job_id}} --force
+
+# Enrich jobs with limit (for testing performance)
+enrich-ai-limit limit='100':
+    uv run python -m src.services.ai_enrich_database --limit {{limit}}
+
+# Force re-enrich all job offers
+enrich-ai-force:
+    uv run python -m src.services.ai_enrich_database --force
+
+# Retry failed/error enrichments (status != SUCCESS)
+enrich-ai-retry:
+    uv run python -m src.services.ai_enrich_database --retry
+
+# Retry with limit
+enrich-ai-retry-limit limit='100':
+    uv run python -m src.services.ai_enrich_database --retry --limit {{limit}}
+
+# ============================================================================
+# MAINTENANCE - Full database reprocessing (use with caution!)
+# ============================================================================
+
+# Re-homogenize entire database (all job offers)
+homogenize-all:
+    @echo "⚠️  Re-homogenizing entire database..."
+    uv run python -c "from src.services.homogenize_database import run_homogenization; run_homogenization()"
+
+# Re-enrich entire database with IA models (all job offers)
+enrich-all-db:
+    @echo "⚠️  Re-enriching entire database with IA models..."
+    @echo "This may take a long time on CPU. Press Ctrl+C to cancel."
+    uv run python -c "from src.services.ai_enrich_database import run_ai_enrichment; run_ai_enrichment(force_reprocess=True)"
+
+# Re-vectorize entire database (regenerate all embeddings)
+vectorize-all:
+    @echo "⚠️  Re-vectorizing entire database..."
+    uv run python -c "from src.services.processor import process_embeddings; process_embeddings(regenerate_content=True)"
+
+# Full reprocessing: homogenize + enrich + vectorize (use after major changes)
+reprocess-all: homogenize-all enrich-all-db vectorize-all
+    @echo "✅ Full database reprocessing complete!"
+
 # ============================================================================
 # API & UI SERVICES
 # ============================================================================
@@ -94,12 +153,12 @@ frontend:
 
 # Run all code quality checks
 check-all: lint typecheck
-    @echo "✓ All checks passed!"
+    @echo "All checks passed!"
 
 # Format code with ruff
 format:
     ruff format .
-    @echo "✓ Code formatted"
+    @echo "Code formatted"
 
 # Lint code with ruff
 lint:
@@ -119,7 +178,7 @@ pre-commit:
 
 # Setup: start Docker + API + UI
 dev: docker-up
-    @echo "✓ Docker started"
+    @echo "Docker started"
     @echo "Starting API and UI..."
     @echo "Run in separate terminals:"
     @echo "  - API:  just backend"
@@ -127,7 +186,7 @@ dev: docker-up
 
 # Full development setup with collection
 dev-full: docker-up collect-all process
-    @echo "✓ Full setup complete"
+    @echo "Full setup complete"
     @echo "Now run:"
     @echo "  - API:  just backend"
     @echo "  - UI:   just frontend"

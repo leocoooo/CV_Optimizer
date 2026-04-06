@@ -36,15 +36,15 @@ def render(api_client: APIClient, api_status: bool):
         )
 
         with st.expander("Filtres avancés"):
-            location = st.text_input("Localisation", placeholder="ex: Paris")
-            contract_type = st.text_input("Type de contrat", placeholder="ex: CDI")
+            location = st.text_input(
+                "Localisation", placeholder="ex: Paris, Île-de-France"
+            )
+            contract_type = st.text_input("Type de contrat", placeholder="ex: CDI, CDD")
             experience = st.selectbox(
-                "Expérience", ["Tous", "D (Débutant)", "E (Expérimenté)", "S (Senior)"]
+                "Expérience", ["Tous", "Junior", "Intermédiaire", "Expérimenté"]
             )
             if experience == "Tous":
                 experience = None
-            else:
-                experience = experience[0]
 
     if st.button(
         "🔍 Lancer le matching",

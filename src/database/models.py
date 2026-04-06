@@ -58,9 +58,54 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     description = Column(Text, nullable=False)  # Description complète du poste
     job_profile = Column(Text)  # Profil demandé / Qualifications
 
+    # ===== CONTENU À VECTORISER =====
+    # Concaténation intelligente pour l'embedding (sans bruit)
+    # Title x3 + ai_hard_skills x2 + ai_sector + ai_missions + ai_soft_skills + job_profile
+    content_to_vectorize = Column(Text, nullable=True)
+
     # ===== VECTEUR D'EMBEDDING =====
     # 384 dimensions pour le modèle all-MiniLM-L6-v2
     embedding = Column(Vector(384))
+
+    # ===== COLONNES HOMOGÉNÉISÉES =====
+    cleaned_title = Column(String(255), nullable=True)  # Titre homogénéisé
+    cleaned_contract_type = Column(
+        String(100), nullable=True
+    )  # Type de contrat homogénéisé
+    cleaned_remote_mode = Column(
+        String(100), nullable=True
+    )  # Mode télétravail homogénéisé
+    cleaned_required_experience = Column(
+        String(50), nullable=True
+    )  # Expérience requise homogénéisée
+    cleaned_required_education = Column(
+        String(100), nullable=True
+    )  # Éducation requise homogénéisée
+
+    # ===== COLONNES ENRICHIES PAR IA =====
+    # Résultats bruts des modèles (traçabilité)
+    output_ner = Column(Text, nullable=True)  # Résultats bruts NER (JSON)
+    output_missions = Column(Text, nullable=True)  # Phrases classifiées "MISSIONS"
+
+    # Résultats nettoyés et agrégés
+    ai_location = Column(String(255), nullable=True)  # LOC extraits
+    ai_job_title = Column(String(255), nullable=True)  # JOB extraits
+    ai_company_name = Column(String(255), nullable=True)  # COMPANY extraits
+    ai_sector = Column(String(255), nullable=True)  # SECTOR extraits
+    ai_contract_type = Column(String(100), nullable=True)  # CONTRACT extraits
+    ai_languages = Column(String(255), nullable=True)  # LANG extraits
+    ai_remote_phrase = Column(Text, nullable=True)  # REMOTE extraits
+    ai_experience_phrase = Column(Text, nullable=True)  # EXP extraits
+    ai_education_phrase = Column(Text, nullable=True)  # EDUC extraits
+    ai_hard_skills = Column(Text, nullable=True)  # Fusion SKILL + hard_skills existant
+    ai_soft_skills = Column(Text, nullable=True)  # Fusion SOFT + soft_skills existant
+    ai_missions = Column(
+        Text, nullable=True
+    )  # Phrases classifiées "MISSIONS" (nettoyées)
+    ai_enrichment_date = Column(DateTime, nullable=True)  # Timestamp du traitement IA
+    ai_enrichment_status = Column(
+        String(50), nullable=True
+    )  # "SUCCESS", "ERROR", "SKIPPED"
 
     # ===== PROPRIÉTÉS CALCULÉES (pour compatibilité API) =====
     @property

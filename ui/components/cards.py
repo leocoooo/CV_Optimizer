@@ -23,7 +23,9 @@ def gradient_header(title: str, subtitle: str, gradient: str = "purple"):
     safe_title = html.escape(title)
     safe_subtitle = html.escape(subtitle)
 
-    subtitle_color = "rgba(255,255,255,0.9)" if gradient != "pastel" else "rgba(51,51,51,0.85)"
+    subtitle_color = (
+        "rgba(255,255,255,0.9)" if gradient != "pastel" else "rgba(51,51,51,0.85)"
+    )
 
     st.markdown(
         f"""

@@ -19,6 +19,7 @@ from src.services.france_travail_collector import run_collector
 from src.services.processor import process_embeddings
 from src.services.scrappe_hw import run_hw_scraper
 from src.services.scrappe_wttj import run_wttj_scraper
+from src.services.homogenize_database import run_homogenization
 from src.database.models import JobOffer
 
 router = APIRouter()
@@ -50,7 +51,11 @@ async def collect_jobs(
     1. Collecte des offres depuis les sources
     2. Vérification des doublons (par ID)
     3. Insertion en base de données
-    4. Génération des embeddings (automatique après collecte)
+    4. **Homogénisation des données** (colonnes `cleaned_*`) - Traite L'INTÉGRALITÉ de la base
+    5. **Enrichissement IA** (NER + Classification → colonnes `ai_*`) - Traite SEULEMENT les offres SANS enrichissement antérieur
+    6. Génération des embeddings - Traite SEULEMENT les offres SANS embedding
+    
+    **Note** : À la première exécution, l'enrichissement IA peut prendre longtemps car toutes les offres en base sont sans enrichissement.
     
     **Authentification** :
     Endpoint protégé par API key. Fournir la clé dans le header `X-API-Key`.
@@ -115,6 +120,22 @@ async def collect_jobs(
                 )
                 logger.success(" Scraping Welcome to the Jungle terminé")
 
+            # === HOMOGÉNISATION ===
+            logger.info(" Homogénisation des données (colonnes cleaned_*)...")
+            await run_in_thread(run_homogenization)
+            logger.success(" Homogénisation terminée")
+
+            # === ENRICHISSEMENT IA ===
+            logger.info(" Enrichissement IA (NER + Classification → colonnes ai_*)...")
+            # Enrichir SEULEMENT les offres collectées dans les 15 dernières minutes
+            # Lazy import pour éviter les effets de bord au démarrage de l'API
+            from src.services.ai_enrich_database import run_ai_enrichment
+
+            await run_in_thread(
+                run_ai_enrichment, force_reprocess=False, only_recent_minutes=15
+            )
+            logger.success(" Enrichissement IA terminé")
+
             # Génération des embeddings pour les nouvelles offres
             logger.info(" Génération des embeddings...")
             await run_in_thread(process_embeddings)
@@ -156,14 +177,22 @@ async def reindex_embeddings(
     api_key: str = Depends(verify_api_key),
 ):
     """
-    Régénère les embeddings pour toutes les offres.
+    Régénère les embeddings et content_to_vectorize pour toutes les offres.
     
     **Cas d'usage** :
     - Changement de modèle d'embedding
     - Correction de bugs dans la vectorisation
     - Réindexation complète de la base
+    - Mise à jour du contenu à vectoriser après changements aux colonnes enrichies
     
-    **Attention** : Opération longue si beaucoup d'offres.
+    **Pour retraiter TOUTE la base (homogénisation + enrichissement + vectorisation)** :
+    Utilise plutôt les commandes du justfile en développement :
+    ```bash
+    just homogenize-all     # Re-homogenize toutes les offres
+    just enrich-all-db      # Re-enrich toutes les offres avec IA
+    just vectorize-all      # Re-vectorize toutes les offres
+    just reprocess-all      # Tout à la fois
+    ```
     
     **Exemple** :
     ```bash
@@ -183,7 +212,7 @@ async def reindex_embeddings(
     # Fonction de réindexation
     async def run_reindex():
         try:
-            await run_in_thread(process_embeddings)
+            await run_in_thread(process_embeddings, regenerate_content=True)
             logger.success("Réindexation terminée avec succès")
         except Exception as e:
             logger.error(f"Erreur lors de la réindexation : {e}")

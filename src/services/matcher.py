@@ -5,8 +5,22 @@ from src.services.embedder import Embedder
 from loguru import logger
 from datetime import datetime, timedelta
 from app.config import get_settings
+import unicodedata
 
 settings = get_settings()
+
+
+def normalize_text(text: str) -> str:
+    """Normalise un texte : enlève accents et tirets pour la comparaison."""
+    if not text:
+        return ""
+    # Enlever les accents
+    normalized = "".join(
+        c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn"
+    )
+    # Remplacer les tirets/traits d'union par des espaces
+    normalized = normalized.replace("-", " ").replace("–", " ").replace("—", " ")
+    return normalized.lower().strip()
 
 
 class JobMatcher:
@@ -46,7 +60,7 @@ class JobMatcher:
         vector_str = str(profile_vector)
 
         # Requête SQL avec bind parameters pour toutes les entrées utilisateur
-        # Les filtres optionnels utilisent la forme (:param IS NULL OR condition)
+        # NOTE: Location filtré en Python après pour normaliser les accents et tirets
         sql_query = text("""
         SELECT
             job_offers.id,
@@ -55,8 +69,8 @@ class JobMatcher:
             job_offers.city,
             job_offers.department,
             job_offers.region,
-            job_offers.contract_type,
-            job_offers.required_experience,
+            COALESCE(job_offers.cleaned_contract_type, job_offers.contract_type) AS contract_type,
+            COALESCE(job_offers.cleaned_required_experience, job_offers.required_experience) AS required_experience,
             job_offers.url,
             job_offers.date_publication,
             job_offers.source,
@@ -66,13 +80,14 @@ class JobMatcher:
             job_offers.date_publication >= :limit_date
             OR (job_offers.date_publication IS NULL AND job_offers.date_scraping >= :limit_date)
         )
-        AND (:location IS NULL OR (
-            job_offers.city ILIKE '%' || :location || '%'
-            OR job_offers.department ILIKE '%' || :location || '%'
-            OR job_offers.region ILIKE '%' || :location || '%'
-        ))
-        AND (:contract_type IS NULL OR job_offers.contract_type = :contract_type)
-        AND (:experience IS NULL OR job_offers.required_experience ILIKE '%' || :experience || '%')
+        AND (
+            :contract_type IS NULL
+            OR COALESCE(job_offers.cleaned_contract_type, job_offers.contract_type) = :contract_type
+        )
+        AND (
+            :experience IS NULL
+            OR COALESCE(job_offers.cleaned_required_experience, job_offers.required_experience) ILIKE '%' || :experience || '%'
+        )
         AND job_offers.embedding IS NOT NULL
         ORDER BY similarity_score DESC NULLS LAST
         LIMIT :top_n
@@ -80,18 +95,36 @@ class JobMatcher:
 
         logger.info(f"Recherche des {top_n} meilleures correspondances avec filtres...")
 
-        # Exécuter la requête avec les bind parameters
+        # Exécuter la requête avec les bind parameters (location filtré en Python)
         results = self.db.execute(
             sql_query,
             {
                 "vector": vector_str,
                 "limit_date": limit_date,
-                "location": location,
                 "contract_type": contract_type,
                 "experience": experience,
                 "top_n": top_n,
             },
         ).fetchall()
+
+        # Filtrer les résultats par location si fourni (en normalisant accents et tirets)
+        if location:
+            normalized_location = normalize_text(location)
+            filtered_results = []
+            for row in results:
+                city = str(row[3]) if row[3] else ""  # Indice de city
+                dept = str(row[4]) if row[4] else ""  # Indice de department
+                region = str(row[5]) if row[5] else ""  # Indice de region
+
+                # Vérifier si la localisation normalisée matche l'une des 3 colonnes
+                if any(
+                    [
+                        normalized_location in normalize_text(city),
+                        normalized_location in normalize_text(dept),
+                        normalized_location in normalize_text(region),
+                    ]
+                ):
+                    filtered_results.append(row)
 
         # Post-process: construire la propriété 'location' pour chaque résultat
         # Convertir les RowTuple en dictionnaires pour ajouter la propriété calculée
