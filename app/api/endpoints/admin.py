@@ -19,6 +19,8 @@ from src.services.france_travail_collector import run_collector
 from src.services.processor import process_embeddings
 from src.services.scrappe_hw import run_hw_scraper
 from src.services.scrappe_wttj import run_wttj_scraper
+from src.services.homogenize_database import run_homogenization
+from src.services.ai_enrich_database import run_ai_enrichment
 from src.database.models import JobOffer
 
 router = APIRouter()
@@ -50,7 +52,9 @@ async def collect_jobs(
     1. Collecte des offres depuis les sources
     2. Vérification des doublons (par ID)
     3. Insertion en base de données
-    4. Génération des embeddings (automatique après collecte)
+    4. **Homogénisation des données** (colonnes `cleaned_*`)
+    5. **Enrichissement IA** (NER + Classification → colonnes `ai_*`)
+    6. Génération des embeddings
     
     **Authentification** :
     Endpoint protégé par API key. Fournir la clé dans le header `X-API-Key`.
@@ -114,6 +118,16 @@ async def collect_jobs(
                     headless=True,
                 )
                 logger.success(" Scraping Welcome to the Jungle terminé")
+
+            # === HOMOGÉNISATION ===
+            logger.info(" Homogénisation des données (colonnes cleaned_*)...")
+            await run_in_thread(run_homogenization)
+            logger.success(" Homogénisation terminée")
+
+            # === ENRICHISSEMENT IA ===
+            logger.info(" Enrichissement IA (NER + Classification → colonnes ai_*)...")
+            await run_in_thread(run_ai_enrichment, force_reprocess=False)
+            logger.success(" Enrichissement IA terminé")
 
             # Génération des embeddings pour les nouvelles offres
             logger.info(" Génération des embeddings...")

@@ -106,7 +106,8 @@ def render(api_client: APIClient, api_status: bool):
 
                     status_message(f"✅ {data['message']}", "success")
                     st.info(
-                        "💡 La collecte s'exécute en arrière-plan. Consultez les logs de l'API pour suivre la progression."
+                        "💡 La collecte s'exécute en arrière-plan (collecte → homogénisation → enrichissement IA → embeddings). "
+                        "Consultez les logs de l'API pour suivre la progression."
                     )
 
                 except requests.HTTPError as e:
@@ -169,11 +170,13 @@ def render(api_client: APIClient, api_status: bool):
         1. Collecte des offres depuis les sources sélectionnées
         2. Vérification des doublons (par URL)
         3. Insertion en base de données
-        4. Génération automatique des embeddings
+        4. **Homogénisation des données** (colonnes `cleaned_*` : titres, contrats, localisations normalisés)
+        5. **Enrichissement IA** (NER + Classification → colonnes `ai_*` : entités, compétences, missions)
+        6. Génération automatique des embeddings
 
         **Temps estimé :**
-        - API seule : ~30s pour 30 offres
-        - API + Scraping : ~2-5 min pour 30 offres (selon les sites)
+        - API seule : ~2-3 min pour 30 offres (avec homogénisation + enrichissement IA)
+        - API + Scraping : ~5-10 min pour 30 offres (selon les sites + enrichissement IA)
         """)
 
     st.markdown("---")
