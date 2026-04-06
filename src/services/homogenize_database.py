@@ -200,32 +200,46 @@ def clean_remote_mode(remote_mode: Optional[str]) -> Optional[str]:
 
 def clean_required_experience(experience: Optional[str]) -> Optional[str]:
     """
-    Homogénéise l'expérience requise :
-    - "debutant" → "0"
-    - "Expérience exigée" → "2"
-    - Sinon extrait le plus petit chiffre trouvé
+    Homogénéise l'expérience requise en 3 catégories :
+    - "Junior" : < 2 ans
+    - "Intermédiaire" : 2-4 ans
+    - "Expérimenté" : > 4 ans
+
+    Extraction du nombre d'années :
+    - "debutant" / "junior" → 0 ans → Junior
+    - "Expérience exigée" → 2 ans → Intermédiaire
+    - Extraction du plus petit chiffre trouvé dans la chaîne
     """
     if not experience:
         return None
 
     exp_normalized = remove_accents(experience.lower().strip())
 
-    # Cas particuliers
+    # Cas particuliers pour l'extraction du nombre d'années
     if "debutant" in exp_normalized or "junior" in exp_normalized:
-        return "0"
+        years = 0
+    elif "experience exigee" in exp_normalized:
+        years = 2
+    else:
+        # Chercher tous les chiffres dans la chaîne
+        numbers = re.findall(r"\d+", exp_normalized)
+        if numbers:
+            # Retourner le plus petit
+            years = min(int(n) for n in numbers)
+            if years >= 15:
+                # Valeur trop grande, probablement pas une année
+                return experience
+        else:
+            # Pas de nombre trouvé, retourner la valeur originale
+            return experience
 
-    if "experience exigee" in exp_normalized:
-        return "2"
-
-    # Chercher tous les chiffres dans la chaîne
-    numbers = re.findall(r"\d+", exp_normalized)
-    if numbers:
-        # Retourner le plus petit
-        min_years = min(int(n) for n in numbers)
-        exp_years = str(min_years)
-        return exp_years if min_years < 15 else experience
-
-    return experience
+    # Catégoriser en 3 niveaux basés sur le nombre d'années
+    if years < 2:
+        return "Junior"
+    elif years < 4:
+        return "Intermédiaire"
+    else:
+        return "Expérimenté"
 
 
 def clean_required_education(education: Optional[str]) -> Optional[str]:
