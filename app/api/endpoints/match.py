@@ -6,7 +6,7 @@ Upload d'un CV et recherche des offres les plus pertinentes.
 import time
 import tempfile
 from typing import Optional
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from loguru import logger
 
@@ -34,15 +34,17 @@ router = APIRouter()
 )
 async def match_cv(
     file: UploadFile = File(..., description="CV au format PDF (max 5 MB)"),
-    location: Optional[str] = Form(None, description="Ville souhaitée"),
-    contract_type: Optional[str] = Form(
+    location: Optional[str] = Query(None, description="Ville souhaitée"),
+    contract_type: Optional[str] = Query(
         None, description="Type de contrat (CDI, CDD, etc.)"
     ),
-    experience: Optional[str] = Form(None, description="Niveau d'expérience (D/E/S)"),
-    days_limit: Optional[int] = Form(
+    experience: Optional[str] = Query(
+        None, description="Niveau d'expérience (Junior, Intermédiaire, Expérimenté)"
+    ),
+    days_limit: Optional[int] = Query(
         settings.DEFAULT_DAYS_LIMIT, description="Limiter aux N derniers jours"
     ),
-    top_n: int = Form(
+    top_n: int = Query(
         settings.DEFAULT_TOP_N,
         ge=1,
         le=settings.MAX_TOP_N,
@@ -232,3 +234,107 @@ async def match_cv(
             os.unlink(tmp_path)
         except Exception:
             pass
+
+
+@router.get(
+    "/filter-options",
+    tags=["Matching"],
+    summary="Récupérer les options de filtres avancés",
+    description="Retourne les valeurs uniques disponibles pour les filtres (types de contrat, niveaux d'expérience, lieux)",
+    status_code=200,
+)
+async def get_filter_options(db: Session = Depends(get_db)):
+    """
+    Récupère les options disponibles pour les filtres avancés du matching.
+
+    **Retourne** :
+    - `contract_types` : Liste des types de contrat nettoyés (CDI, CDD, etc.)
+    - `experience_levels` : Liste des niveaux d'expérience nettoyés
+    - `locations` : Dict avec les villes, départements et régions uniques
+
+    **Utilisation** : Permet de remplir les dropdowns du formulaire de filtres.
+
+    Example response:
+    ```json
+    {
+        "contract_types": ["CDI", "CDD", "Stage"],
+        "experience_levels": ["Débutant", "Expérimenté", "Senior"],
+        "locations": {
+            "cities": ["Paris", "Lyon", "Marseille"],
+            "departments": ["Île-de-France", "Rhône"],
+            "regions": ["PACA", "Auvergne-Rhône-Alpes"]
+        }
+    }
+    ```
+    """
+    from src.database.models import JobOffer
+
+    try:
+        # Récupérer les types de contrat uniques (nettoyés)
+        contract_types = (
+            db.query(JobOffer.cleaned_contract_type)
+            .filter(JobOffer.cleaned_contract_type.is_not(None))
+            .distinct()
+            .all()
+        )
+        contract_types_list = sorted([ct[0] for ct in contract_types if ct[0]])
+
+        # Récupérer les niveaux d'expérience uniques (nettoyés)
+        experience_levels = (
+            db.query(JobOffer.cleaned_required_experience)
+            .filter(JobOffer.cleaned_required_experience.is_not(None))
+            .distinct()
+            .all()
+        )
+        experience_levels_list = sorted([exp[0] for exp in experience_levels if exp[0]])
+
+        # Récupérer les lieux uniques
+        cities = (
+            db.query(JobOffer.city)
+            .filter(JobOffer.city.is_not(None))
+            .distinct()
+            .order_by(JobOffer.city)
+            .all()
+        )
+        cities_list = [c[0] for c in cities if c[0]]
+
+        departments = (
+            db.query(JobOffer.department)
+            .filter(JobOffer.department.is_not(None))
+            .distinct()
+            .order_by(JobOffer.department)
+            .all()
+        )
+        departments_list = [d[0] for d in departments if d[0]]
+
+        regions = (
+            db.query(JobOffer.region)
+            .filter(JobOffer.region.is_not(None))
+            .distinct()
+            .order_by(JobOffer.region)
+            .all()
+        )
+        regions_list = [r[0] for r in regions if r[0]]
+
+        logger.info(
+            f"Filter options retrieved: {len(contract_types_list)} contracts, "
+            f"{len(experience_levels_list)} experiences, {len(cities_list)} cities"
+        )
+
+        return {
+            "contract_types": contract_types_list,
+            "experience_levels": experience_levels_list,
+            "locations": {
+                "cities": cities_list,
+                "departments": departments_list,
+                "regions": regions_list,
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des options de filtres: {e}")
+        return {
+            "contract_types": [],
+            "experience_levels": [],
+            "locations": {"cities": [], "departments": [], "regions": []},
+        }

@@ -112,6 +112,30 @@ enrich-ai-retry-limit limit='100':
     uv run python -m src.services.ai_enrich_database --retry --limit {{limit}}
 
 # ============================================================================
+# MAINTENANCE - Full database reprocessing (use with caution!)
+# ============================================================================
+
+# Re-homogenize entire database (all job offers)
+homogenize-all:
+    @echo "⚠️  Re-homogenizing entire database..."
+    uv run python -c "from src.services.homogenize_database import run_homogenization; run_homogenization()"
+
+# Re-enrich entire database with IA models (all job offers)
+enrich-all-db:
+    @echo "⚠️  Re-enriching entire database with IA models..."
+    @echo "This may take a long time on CPU. Press Ctrl+C to cancel."
+    uv run python -c "from src.services.ai_enrich_database import run_ai_enrichment; run_ai_enrichment(force_reprocess=True)"
+
+# Re-vectorize entire database (regenerate all embeddings)
+vectorize-all:
+    @echo "⚠️  Re-vectorizing entire database..."
+    uv run python -c "from src.services.processor import process_embeddings; process_embeddings(regenerate_content=True)"
+
+# Full reprocessing: homogenize + enrich + vectorize (use after major changes)
+reprocess-all: homogenize-all enrich-all-db vectorize-all
+    @echo "✅ Full database reprocessing complete!"
+
+# ============================================================================
 # API & UI SERVICES
 # ============================================================================
 

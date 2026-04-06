@@ -542,15 +542,17 @@ def run_ai_enrichment(
     retry_failed: bool = False,
     batch_size: int = BATCH_SIZE,
     limit: Optional[int] = None,
+    only_recent_minutes: Optional[int] = None,
 ):
     """
-    Lance l'enrichissement IA pour toutes les offres.
+    Lance l'enrichissement IA pour les offres.
 
     Args:
         force_reprocess : Si True, retraite même les offres déjà enrichies
         retry_failed : Si True, retraite seulement les offres avec statut != SUCCESS (ERROR ou SKIPPED)
         batch_size : Nombre d'offres par batch
         limit : Nombre max d'offres à traiter (pour tests)
+        only_recent_minutes : Si fourni, enrichit SEULEMENT les offres collectées dans les N dernières minutes
     """
     logger.info("=" * 60)
     logger.info("Starting AI enrichment...")
@@ -580,8 +582,21 @@ def run_ai_enrichment(
                 | (JobOffer.ai_enrichment_status.is_(None))
             )
         else:
-            # Traiter les offres jamais enrichies
-            query = session.query(JobOffer).filter(JobOffer.output_ner.is_(None))
+            # Traiter SEULEMENT les offres avec ai_enrichment_status IS NULL (jamais enrichies)
+            # Plus robuste que output_ner.is_(None)
+            query = session.query(JobOffer).filter(
+                JobOffer.ai_enrichment_status.is_(None)
+            )
+
+        # Filtrer par date si only_recent_minutes est fourni
+        if only_recent_minutes:
+            from datetime import timedelta
+
+            cutoff_time = datetime.now() - timedelta(minutes=only_recent_minutes)
+            query = query.filter(JobOffer.date_scraping >= cutoff_time)
+            logger.info(
+                f"Filtering for offers added in the last {only_recent_minutes} minutes"
+            )
 
         if limit:
             query = query.limit(limit)
