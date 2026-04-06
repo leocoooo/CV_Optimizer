@@ -291,7 +291,7 @@ def create_cleaned_columns():
     with engine.connect() as connection:
         for col_name in cleaned_columns:
             if not column_exists("job_offers", col_name):
-                logger.info(f"Créating column {col_name}...")
+                logger.info(f"Creating column {col_name}...")
                 alter_query = text(
                     f"ALTER TABLE job_offers ADD COLUMN {col_name} VARCHAR(255) DEFAULT NULL;"
                 )

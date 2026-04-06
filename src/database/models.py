@@ -89,6 +89,7 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     ai_sector = Column(String(255), nullable=True)  # SECTOR extraits
     ai_contract_type = Column(String(100), nullable=True)  # CONTRACT extraits
     ai_languages = Column(String(255), nullable=True)  # LANG extraits
+    ai_remote_phrase = Column(Text, nullable=True)  # REMOTE extraits
     ai_experience_phrase = Column(Text, nullable=True)  # EXP extraits
     ai_education_phrase = Column(Text, nullable=True)  # EDUC extraits
     ai_hard_skills = Column(Text, nullable=True)  # Fusion SKILL + hard_skills existant
