@@ -24,6 +24,7 @@ from loguru import logger
 from sqlalchemy import text, inspect
 
 from src.database.database import engine, SessionLocal
+from src.services.processor import build_content_to_vectorize
 from app.config import get_settings
 
 # Télécharger les modèles NLTK pour tokenization
@@ -619,9 +620,12 @@ def run_ai_enrichment(
                 result = enrich_job_offer(job, ner_pipe, class_pipe)
 
                 if result["status"] == "SUCCESS":
-                    # Mettre à jour l'offre
+                    # Mettre à jour l'offre avec les données enrichies
                     for key, value in result["data"].items():
                         setattr(job, key, value)
+                    # Construire content_to_vectorize (concaténation intelligente)
+                    content = build_content_to_vectorize(job)
+                    setattr(job, "content_to_vectorize", content)
                     batch_success += 1
                     count_success += 1
                 elif result["status"] == "SKIPPED":

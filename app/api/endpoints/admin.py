@@ -170,12 +170,13 @@ async def reindex_embeddings(
     api_key: str = Depends(verify_api_key),
 ):
     """
-    Régénère les embeddings pour toutes les offres.
+    Régénère les embeddings et content_to_vectorize pour toutes les offres.
     
     **Cas d'usage** :
     - Changement de modèle d'embedding
     - Correction de bugs dans la vectorisation
     - Réindexation complète de la base
+    - Mise à jour du contenu à vectoriser après changements aux colonnes enrichies
     
     **Attention** : Opération longue si beaucoup d'offres.
     
@@ -197,7 +198,7 @@ async def reindex_embeddings(
     # Fonction de réindexation
     async def run_reindex():
         try:
-            await run_in_thread(process_embeddings)
+            await run_in_thread(process_embeddings, regenerate_content=True)
             logger.success("Réindexation terminée avec succès")
         except Exception as e:
             logger.error(f"Erreur lors de la réindexation : {e}")

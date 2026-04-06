@@ -58,6 +58,11 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
     description = Column(Text, nullable=False)  # Description complète du poste
     job_profile = Column(Text)  # Profil demandé / Qualifications
 
+    # ===== CONTENU À VECTORISER =====
+    # Concaténation intelligente pour l'embedding (sans bruit)
+    # Title x3 + ai_hard_skills x2 + ai_sector + ai_missions + ai_soft_skills + job_profile
+    content_to_vectorize = Column(Text, nullable=True)
+
     # ===== VECTEUR D'EMBEDDING =====
     # 384 dimensions pour le modèle all-MiniLM-L6-v2
     embedding = Column(Vector(384))
