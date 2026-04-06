@@ -261,6 +261,72 @@ def merge_skills(existing: Optional[str], new_list: List[str]) -> str:
     return ", ".join(unique_skills)
 
 
+def generate_chunks(
+    text: str,
+    tokenizer,
+    max_tokens: int = 512,
+    overlap_chars: int = 256,
+) -> list[str]:
+    """
+    Génère N chunks dynamiquement basé sur le nombre de tokens RÉELS.
+
+    Les modèles CamemBERT ont une limite de 512 tokens stricte.
+    Tokenise réellement pour chaque chunk et s'arrête à max_tokens.
+
+    Avec overlap pour contexte BERT bidirectionnel.
+
+    Args:
+        text: Texte brut à diviser
+        tokenizer: Tokenizer pour compter les tokens réels
+        max_tokens: Limite de tokens par chunk (défaut: 512)
+        overlap_chars: Nombre de caractères d'overlap entre chunks (défaut: 256)
+
+    Returns:
+        Liste de chunks, chacun avec <= max_tokens (strictement)
+    """
+    if not text.strip():
+        return []
+
+    chunks = []
+    start = 0
+
+    while start < len(text):
+        # Commencer par une estimation (chars ≈ 4 tokens en français)
+        # Mais on va vérifier réellement
+        est_chars = max_tokens * 4
+        end = min(start + est_chars, len(text))
+
+        # Vérifier combien de tokens on a vraiment
+        potential_chunk = text[start:end].strip()
+        token_count = len(tokenizer.encode(potential_chunk))
+
+        # Si trop de tokens, réduire progressivement
+        while token_count > max_tokens and end > start + 100:
+            # Réduire de 10%
+            end = int(end * 0.9)
+            potential_chunk = text[start:end].strip()
+            token_count = len(tokenizer.encode(potential_chunk))
+
+        # Ne pas découper un mot : trouver le dernier espace
+        if end < len(text):
+            last_space = potential_chunk.rfind(" ")
+            if last_space > 0:
+                potential_chunk = potential_chunk[:last_space].strip()
+
+        if potential_chunk:
+            chunks.append(potential_chunk)
+            # Avancer au-delà du chunk actuel
+            start = start + len(potential_chunk)
+
+            # Ajouter overlap pour le prochain chunk (contexte BERT)
+            if start < len(text):
+                start = max(0, start - overlap_chars)
+        else:
+            break
+
+    return chunks if chunks else [text]
+
+
 # ===== COLONNES DE BASE DE DONNÉES =====
 def column_exists(table_name: str, column_name: str) -> bool:
     """Vérifie si une colonne existe dans une table."""
@@ -280,6 +346,7 @@ def create_ai_columns():
         "ai_sector",
         "ai_contract_type",
         "ai_languages",
+        "ai_remote_phrase",
         "ai_experience_phrase",
         "ai_education_phrase",
         "ai_hard_skills",
@@ -292,7 +359,7 @@ def create_ai_columns():
     with engine.connect() as connection:
         for col_name in ai_columns:
             if not column_exists("job_offers", col_name):
-                logger.info(f"Créating column {col_name}...")
+                logger.info(f"Creating column {col_name}...")
 
                 # Déterminer le type de colonne
                 if col_name in [
@@ -342,9 +409,38 @@ def enrich_job_offer(job: Any, ner_pipe, class_pipe) -> Dict[str, Any]:
                 "data": None,
             }
 
+        # Générer N chunks dynamiquement (pas juste 2)
+        tokenizer = ner_pipe.tokenizer
+        chunks = generate_chunks(
+            full_text, tokenizer, max_tokens=512, overlap_chars=256
+        )
+
+        # === LOGGING DES TOKENS ===
+        full_tokens = tokenizer.encode(full_text)
+        total_tokens = len(full_tokens)
+
+        # Logs détaillés par chunk
+        chunk_log = ", ".join(
+            f"chunk{i + 1}={len(tokenizer.encode(c))}t" for i, c in enumerate(chunks)
+        )
+        logger.info(
+            f"Job {job.id}: full_text={total_tokens} tokens, "
+            f"chunks_count={len(chunks)}, {chunk_log}"
+        )
+
+        # Alerte si le texte original dépasse la limite d'un seul chunk
+        if total_tokens > 512:
+            logger.warning(
+                f"Job {job.id}: Texte original de {total_tokens} tokens "
+                f"(> limite modèle 512). Traité en {len(chunks)} chunk(s)."
+            )
+
         # Phase 1 : Classification (phrases MISSIONS)
+        # Utilise le split par sentences (pas par tokens) - phrases rarement > 512 tokens
         logger.debug(f"Classification pour job {job.id}...")
-        sentences = clean_and_split_text(full_text)
+        sentences = []
+        for chunk in chunks:
+            sentences.extend(clean_and_split_text(chunk))
 
         if not sentences:
             return {
@@ -362,9 +458,15 @@ def enrich_job_offer(job: Any, ner_pipe, class_pipe) -> Dict[str, Any]:
         ]
         output_missions = "\n".join(missions_sentences) if missions_sentences else None
 
-        # Phase 2 : NER
-        logger.debug(f"NER pour job {job.id}...")
-        ner_results = ner_pipe(full_text)
+        # Phase 2 : NER (traiter TOUS les chunks et fusionner les résultats)
+        logger.debug(f"NER pour job {job.id} ({len(chunks)} chunks)...")
+        ner_results = []
+
+        for i, chunk in enumerate(chunks):
+            logger.debug(f"Job {job.id}: NER chunk {i + 1}/{len(chunks)}")
+            # Chaque chunk est garanti <= 512 tokens, pas besoin de params additionnels
+            chunk_ner = ner_pipe(chunk)
+            ner_results.extend(chunk_ner)
 
         # Aggréger par entity_group
         ner_by_type = {}
@@ -394,6 +496,7 @@ def enrich_job_offer(job: Any, ner_pipe, class_pipe) -> Dict[str, Any]:
             "ai_sector": ("SECTOR", None),
             "ai_contract_type": ("CONTRACT", None),
             "ai_languages": ("LANG", None),
+            "ai_remote_phrase": ("REMOTE", "remote_mode"),
             "ai_experience_phrase": ("EXP", None),
             "ai_education_phrase": ("EDUC", None),
         }
