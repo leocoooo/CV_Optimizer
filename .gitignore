@@ -14,3 +14,18 @@ data/.DS_Store
 .DS_Store
 
 notebooks/
+
+# AI Model Files (cached locally, can be redownloaded)
+models/
+models_cache/
+.cache/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Environment
+.env
+.env.local

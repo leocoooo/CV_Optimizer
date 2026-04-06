@@ -221,7 +221,9 @@ def clean_required_experience(experience: Optional[str]) -> Optional[str]:
     numbers = re.findall(r"\d+", exp_normalized)
     if numbers:
         # Retourner le plus petit
-        return str(min(int(n) for n in numbers))
+        min_years = min(int(n) for n in numbers)
+        exp_years = str(min_years)
+        return exp_years if min_years < 15 else experience
 
     return experience
 

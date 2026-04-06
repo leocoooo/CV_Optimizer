@@ -102,6 +102,16 @@ just advise                # Recommandations LLM
 just backend               # Démarrer FastAPI
 just frontend              # Démarrer Streamlit
 
+# DATA QUALITY - Homogénisation des données
+just homogenize-db         # Normaliser les colonnes (cleaned_*)
+
+# AI ENRICHMENT - Deep Learning NLP extraction
+just enrich-ai             # Enrichir toutes offres non traitées (ai_*)
+just enrich-ai-test ID     # Tester enrichissement sur 1 offre
+just enrich-ai-force       # Force re-enrichir toutes offres
+just enrich-ai-retry       # Réessayer les offres en erreur
+just enrich-ai-limit N     # Enrichir max N offres
+
 # QUALITÉ DU CODE
 just format                # Formater le code (Ruff)
 just lint                  # Vérifier le code (Ruff)
@@ -122,26 +132,27 @@ uvicorn app.main:app --reload
 # Lancer l'UI Streamlit
 streamlit run streamlit_app.py
 
-# Collecter offres France Travail
-uv run python -m src.services.france_travail_collector
+# COLLECTE DE DONNÉES
+uv run python -m src.services.france_travail_collector  # France Travail
+uv run python -m src.services.scrappe_wttj              # Welcome to the Jungle
+uv run python -m src.services.scrappe_hw                # HelloWork
 
-# Scraper Welcome to the Jungle
-uv run python -m src.services.scrappe_wttj
+# DATA QUALITY - Homogénisation
+uv run python -m src.services.homogenize_database       # Colonnes cleaned_*
 
-# Scraper HelloWork
-uv run python -m src.services.scrappe_hw
+# AI ENRICHMENT - Deep Learning NLP
+uv run python -m src.services.ai_enrich_database        # Colonnes ai_*
+uv run python -m src.services.ai_enrich_database --test-id "job_id"  # Test 1 offre
+uv run python -m src.services.ai_enrich_database --retry           # Réessayer erreurs
+uv run python -m src.services.ai_enrich_database --limit 100       # Max 100 offres
 
-# Vectoriser les offres
-uv run python -m src.services.processor
+# VECTORISATION & MATCHING
+uv run python -m src.services.processor                 # Vectoriser offres
+uv run python -m src.services.matcher                   # Matcher CV/offres
 
-# Matcher un CV
-uv run python -m src.services.matcher
-
-# Extraire texte d'un CV PDF
-uv run python -m src.services.cv_reader
-
-# Obtenir recommandations LLM
-uv run python -m src.services.llm_advisor
+# UTILITAIRES
+uv run python -m src.services.cv_reader                 # Extraire texte CV
+uv run python -m src.services.llm_advisor               # Recommandations LLM
 ```
 
 ---
@@ -183,7 +194,14 @@ CV-Optimizer/
 │       ├── cv_reader.py               # Extraction PDF
 │       ├── llm_advisor.py             # Recommandations
 │       ├── embedder.py                # Embeddings
-│       └── scraping_utils.py          # Utilitaires scraping
+│       ├── homogenize_database.py     # 🆕 Normalisation colonnes
+│       ├── ai_enrich_database.py      # 🆕 AI enrichment NLP
+│       ├── scraping_utils.py          # Utilitaires scraping
+│       └── ...
+│
+├── models/                            # 🆕 Modèles DL locaux (843 MB)
+│   ├── ner/                          # NER CamemBERT (420 MB)
+│   └── classifier/                   # Classification CamemBERT (423 MB)
 │
 ├── ui/                            # Interface Streamlit
 │   ├── components/               # Composants réutilisables
@@ -192,7 +210,6 @@ CV-Optimizer/
 │
 ├── data/                          # Données
 │   ├── CVs/                      # Fichiers CV
-│   └── scrapping/                # Données scrappées
 │
 ├── docker-compose.yml             # PostgreSQL + pgvector
 ├── pyproject.toml                 # Dépendances Python
@@ -226,6 +243,193 @@ Les hooks s'exécutent automatiquement avant chaque commit si initialisés avec 
 
 ---
 
+## 🧹 Services de qualité de données
+
+### 1️⃣ Homogénéisation des données (`cleaned_*` colonnes)
+
+Le service **homogenize_database** normalise les données existantes pour permettre un matching et un filtrage cohérent.
+
+#### Colonnes créées
+
+| Colonne | Source | Transformation |
+|---------|--------|-----------------|
+| `cleaned_title` | `title` | Fuzzy match contre titres standardisés + nettoyage H/F |
+| `cleaned_contract_type` | `contract_type` | 9 types mappés (CDI, CDD, Stage, Interim, etc.) |
+| `cleaned_remote_mode` | `remote_mode` | 3 modes (Pas de télétravail / Possible / Complet) |
+| `cleaned_required_experience` | `required_experience` | Années extraites ou 0/2 (débutant/expérience) |
+| `cleaned_required_education` | `required_education` | 5 niveaux (Doctorat / Master / Bac+3/4 / Bac+2 / Bac et moins) |
+
+#### Usage
+
+```bash
+# Normaliser toutes les offres
+just homogenize-db
+
+# Directement
+uv run python -m src.services.homogenize_database
+```
+
+**Bénéfices** :
+- Matching CV ↔ offres plus fiable
+- Filtres cohérents sur les offres
+- Fusion de données multi-sources
+
+---
+
+### 2️⃣ AI Enrichment - Extraction Deep Learning (`ai_*` colonnes)
+
+Le service **ai_enrich_database** utilise deux modèles CamemBERT français pré-entraînés pour extraire des informations structurées des offres.
+
+#### Modèles utilisés
+
+| Modèle | Tâche | Entités |
+|--------|-------|---------|
+| **leocooo/v2-camembert-ner-job-ads** | NER (Token Classification) | SKILL, SOFT, LOC, JOB, COMPANY, SECTOR, CONTRACT, LANG, EXP, EDUC, REMOTE |
+| **leocooo/camembert-job-classifier** | Classification (Sequence) | MISSION (phrases de missions), OTHER |
+
+#### Colonnes créées
+
+**Résultats bruts** (traçabilité) :
+- `output_ner` (JSON) - Entités brutes extraites par le NER
+- `output_missions` (TEXT) - Phrases classifiées comme "MISSION"
+
+**Résultats nettoyés** (15 colonnes) :
+```
+ai_location, ai_job_title, ai_company_name, 
+ai_sector, ai_contract_type, ai_languages,
+ai_experience_phrase, ai_education_phrase,
+ai_hard_skills, ai_soft_skills,
+ai_missions,  ← Fusion de output_missions
+ai_enrichment_date, ai_enrichment_status
+```
+
+#### Configuration initiale
+
+⚠️ **Première exécution** : Les modèles sont téléchargés et stockés localement dans `./models/` (843 MB)
+
+```bash
+# Télécharger & initialiser les modèles (5 min)
+uv run python << 'EOF'
+import os
+from huggingface_hub import snapshot_download
+
+os.makedirs('./models/ner', exist_ok=True)
+os.makedirs('./models/classifier', exist_ok=True)
+
+print("Téléchargement NER...")
+snapshot_download('leocooo/v2-camembert-ner-job-ads',
+                 local_dir='./models/ner',
+                 local_dir_use_symlinks=False)
+
+print("Téléchargement Classifier...")
+snapshot_download('leocooo/camembert-job-classifier',
+                 local_dir='./models/classifier',
+                 local_dir_use_symlinks=False)
+print("✓ Modèles téléchargés!")
+EOF
+```
+
+#### Usage
+
+```bash
+# Première tranche d'enrichissement (offres jamais traitées)
+just enrich-ai
+
+# Tester sur une offre
+just enrich-ai-test "202XLSC"
+
+# Traiter seulement 100 offres
+just enrich-ai-limit 100
+
+# Réessayer les offres en erreur
+just enrich-ai-retry
+
+# Force recalcul sur toutes offres
+just enrich-ai-force
+
+# Directement
+uv run python -m src.services.ai_enrich_database [--retry | --limit N | --force]
+```
+
+#### Suivi du statut
+
+```python
+from src.database.database import SessionLocal
+from src.database.models import JobOffer
+from sqlalchemy import func
+
+session = SessionLocal()
+stats = session.query(
+    JobOffer.ai_enrichment_status,
+    func.count(JobOffer.id)
+).group_by(JobOffer.ai_enrichment_status).all()
+
+for status, count in stats:
+    print(f"{status}: {count}")
+# None: 2100  (not yet enriched)
+# SUCCESS: 370 (enriched)
+# ERROR: 19    (failed - can retry)
+```
+
+#### Extraction d'exemple
+
+```json
+{
+  "ai_job_title": "Développeur-se Python / Linux",
+  "ai_hard_skills": "Python, Linux, Docker, FastAPI, Machine Learning, ...",
+  "ai_soft_skills": "Autonomie, Rigueur, Collaboration",
+  "ai_missions": "Tes missions :\n- Développement backend Python\n- Optimisation pipelines IA\n- Architecture Linux on-prem",
+  "ai_enrichment_status": "SUCCESS"
+}
+```
+
+#### Performance
+
+- **Capacité** : CPU-only (~2-3 sec/offre)
+- **Précision** : NER ~92%, Classification ~94% (CamemBERT français)
+- **Scalabilité** : Batch de 16 offres, idempotent
+
+**Note** : Les modèles restent locaux. Aucun upload vers Hugging Face. Stockage dans `./models/` qui doit être cloné/téléchargé par les nouveaux utilisateurs.
+
+---
+
+## 📥 Setup pour nouveau développeur
+
+Après avoir cloné le projet :
+
+```bash
+# 1. Environnement Python
+uv install --all-groups
+
+# 2. Database
+docker-compose up -d
+uv run python -m src.database.init_db
+
+# 3. Modèles NLP (une seule fois, très important!)
+# Option A: Script automatisé (recommandé)
+python setup_models.py
+
+# Option B: Manuel
+uv run python << 'EOF'
+import os
+from huggingface_hub import snapshot_download
+os.makedirs('./models/ner', exist_ok=True)
+os.makedirs('./models/classifier', exist_ok=True)
+snapshot_download('leocooo/v2-camembert-ner-job-ads', local_dir='./models/ner', local_dir_use_symlinks=False)
+snapshot_download('leocooo/camembert-job-classifier', local_dir='./models/classifier', local_dir_use_symlinks=False)
+print("✓ Modèles prêts!")
+EOF
+
+# 4. Pre-commit hooks
+pre-commit install
+
+# 5. Test!
+just backend  # Terminal 1
+just frontend # Terminal 2
+```
+
+---
+
 ## 📝 Workflows typiques
 
 ### Workflow 1 : Configuration complète du développement
@@ -238,12 +442,19 @@ just backend                # API
 just frontend               # UI
 ```
 
-### Workflow 2 : Remplir la base avec des offres
+### Workflow 2 : Remplir la base avec des offres **enrichies**
 
 ```bash
-just docker-up              # Démarrer PostgreSQL
+just docker-up              # PostgreSQL
 just collect-all            # Collecter toutes sources
-just process                # Vectoriser les offres
+
+# OPTIONNEL mais recommandé : normalisation
+just homogenize-db          # Colonnes cleaned_*
+
+# AI Enrichment
+just enrich-ai              # Colonnes ai_*
+
+just process                # Vectorisation pour matching
 ```
 
 ### Workflow 3 : Développement complet (collect → process → run)
@@ -332,4 +543,4 @@ just docker-view-data
 
 ## 📄 Licence
 
-CV-Optimizer - Projet académique M2 MOSEF
+CV-Optimizer

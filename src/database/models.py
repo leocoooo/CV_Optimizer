@@ -77,6 +77,30 @@ class JobOffer(Base):  # type: ignore[misc,valid-type]
         String(100), nullable=True
     )  # Éducation requise homogénéisée
 
+    # ===== COLONNES ENRICHIES PAR IA =====
+    # Résultats bruts des modèles (traçabilité)
+    output_ner = Column(Text, nullable=True)  # Résultats bruts NER (JSON)
+    output_missions = Column(Text, nullable=True)  # Phrases classifiées "MISSIONS"
+
+    # Résultats nettoyés et agrégés
+    ai_location = Column(String(255), nullable=True)  # LOC extraits
+    ai_job_title = Column(String(255), nullable=True)  # JOB extraits
+    ai_company_name = Column(String(255), nullable=True)  # COMPANY extraits
+    ai_sector = Column(String(255), nullable=True)  # SECTOR extraits
+    ai_contract_type = Column(String(100), nullable=True)  # CONTRACT extraits
+    ai_languages = Column(String(255), nullable=True)  # LANG extraits
+    ai_experience_phrase = Column(Text, nullable=True)  # EXP extraits
+    ai_education_phrase = Column(Text, nullable=True)  # EDUC extraits
+    ai_hard_skills = Column(Text, nullable=True)  # Fusion SKILL + hard_skills existant
+    ai_soft_skills = Column(Text, nullable=True)  # Fusion SOFT + soft_skills existant
+    ai_missions = Column(
+        Text, nullable=True
+    )  # Phrases classifiées "MISSIONS" (nettoyées)
+    ai_enrichment_date = Column(DateTime, nullable=True)  # Timestamp du traitement IA
+    ai_enrichment_status = Column(
+        String(50), nullable=True
+    )  # "SUCCESS", "ERROR", "SKIPPED"
+
     # ===== PROPRIÉTÉS CALCULÉES (pour compatibilité API) =====
     @property
     def created_at(self) -> datetime | None:
