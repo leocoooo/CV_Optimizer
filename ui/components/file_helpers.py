@@ -2,9 +2,11 @@
 Helpers pour l'upload et la gestion de fichiers.
 """
 
+from typing import Optional
+
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
-from typing import Optional
+
 from ui.utils.config import MAX_FILE_SIZE_MB
 
 
@@ -20,31 +22,35 @@ def cv_uploader(key: Optional[str] = None) -> Optional[UploadedFile]:
     """
     st.markdown(
         """
-        <div style='background: #f8f9fa; padding: 1rem; border-radius: 8px; 
-                    border: 2px dashed #667eea; margin-bottom: 1rem;'>
-            <p style='margin: 0; color: #666; text-align: center;'>
-                📄 Glissez-déposez votre CV ici ou cliquez pour parcourir
+        <div class="upload-shell">
+            <p class="upload-title">Déposez un CV PDF</p>
+            <p class="upload-copy">
+                Le fichier est analysé localement par l'API pour extraire le texte,
+                lancer le matching et générer des conseils ciblés.
             </p>
+            <p class="small-note">Format accepté : PDF · Taille max : 5 MB</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     uploaded_file = st.file_uploader(
-        "Choisir un fichier CV (PDF)",
+        "Choisir un CV PDF",
         type=["pdf"],
-        help="Formats acceptés: PDF uniquement (max 5MB)",
+        help="Formats acceptés : PDF uniquement",
         label_visibility="collapsed",
         key=key,
     )
 
-    if uploaded_file:
-        file_size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
-        if file_size_mb > MAX_FILE_SIZE_MB:
-            st.error(
-                f"❌ Fichier trop volumineux: {file_size_mb:.2f} MB (max {MAX_FILE_SIZE_MB} MB)"
-            )
-            return None
-        st.success(f"✅ Fichier chargé: {uploaded_file.name} ({file_size_mb:.2f} MB)")
+    if not uploaded_file:
+        return None
 
+    file_size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
+    if file_size_mb > MAX_FILE_SIZE_MB:
+        st.error(
+            f"Fichier trop volumineux : {file_size_mb:.2f} MB (max {MAX_FILE_SIZE_MB} MB)."
+        )
+        return None
+
+    st.success(f"{uploaded_file.name} chargé ({file_size_mb:.2f} MB).")
     return uploaded_file

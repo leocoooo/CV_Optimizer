@@ -82,11 +82,11 @@ advise:
 
 # Start FastAPI server
 backend:
-    uvicorn app.main:app --reload
+    uv run uvicorn app.main:app --reload
 
 # Start Streamlit interface
 frontend:
-    streamlit run streamlit_app.py
+    uv run streamlit run streamlit_app.py
 
 # ============================================================================
 # CODE QUALITY
@@ -98,20 +98,20 @@ check-all: lint typecheck
 
 # Format code with ruff
 format:
-    ruff format .
+    uv run ruff format .
     @echo "✓ Code formatted"
 
 # Lint code with ruff
 lint:
-    ruff check .
+    uv run ruff check .
 
 # Type checking with mypy
 typecheck:
-    mypy .
+    uv run mypy .
 
 # Run pre-commit hooks
 pre-commit:
-    pre-commit run --all-files
+    uv run pre-commit run --all-files
 
 # ============================================================================
 # DEVELOPMENT WORKFLOWS
@@ -146,4 +146,3 @@ db-connect:
 # Count rows in job_offers
 db-count:
     psql -d "{{db_url}}" -c "SELECT COUNT(*) as total_offers FROM job_offers;"
-

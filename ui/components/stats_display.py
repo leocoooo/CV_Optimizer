@@ -2,124 +2,71 @@
 Composant d'affichage des statistiques.
 """
 
+from typing import Any
+
 import streamlit as st
-import html
-from typing import Dict, Any
-from ui.utils.config import GRADIENTS
+
+from ui.components.cards import info_card, metric_row, section_intro, tag_cloud
+from ui.utils.formatters import compact_number, format_datetime
 
 
-def display_stats(stats: Dict[str, Any]):
-    """
-    Affiche les statistiques de la base de données avec des cards colorées.
+def display_stats(stats: dict[str, Any]) -> None:
+    """Affiche les statistiques de la base de données."""
+    embeddings = stats.get("embeddings", {})
+    section_intro(
+        "Photo de la base",
+        "Vue consolidée sur le volume, l'indexation et la fraîcheur des données.",
+    )
 
-    Args:
-        stats: Dictionnaire contenant les statistiques
-    """
-    # Statistiques principales avec cards colorées
-    col1, col2, col3, col4 = st.columns(4)
+    metric_row(
+        [
+            {
+                "label": "Offres en base",
+                "value": compact_number(stats.get("total_jobs", 0)),
+                "detail": "Toutes sources confondues",
+                "tone": "accent",
+            },
+            {
+                "label": "Vectorisées",
+                "value": compact_number(embeddings.get("with_embeddings", 0)),
+                "detail": "Embeddings disponibles pour le matching",
+                "tone": "sage",
+            },
+            {
+                "label": "À indexer",
+                "value": compact_number(embeddings.get("without_embeddings", 0)),
+                "detail": "Offres en attente de vectorisation",
+                "tone": "gold",
+            },
+            {
+                "label": "Taux d'indexation",
+                "value": f"{embeddings.get('percentage_indexed', 0):.1f}%",
+                "detail": "Couverture des embeddings",
+                "tone": "sage",
+            },
+        ]
+    )
 
-    embeddings_data = stats.get("embeddings", {})
-
-    with col1:
-        st.markdown(
-            f"""
-            <div style='background: {GRADIENTS["purple"]}; 
-                        padding: 1.5rem; border-radius: 12px; text-align: center;'>
-                <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
-                    Total offres
-                </div>
-                <div style='color: white; font-size: 2rem; font-weight: 600;'>
-                    {stats.get("total_jobs", 0)}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    if stats.get("by_source"):
+        info_card(
+            "Répartition par source",
+            "Le volume collecté permet de suivre la diversité du marché couvert.",
+            tone="sage",
+        )
+        tag_cloud(
+            [f"{source} · {count}" for source, count in stats["by_source"].items()],
+            tone="accent",
         )
 
-    with col2:
-        st.markdown(
-            f"""
-            <div style='background: {GRADIENTS["pink"]}; 
-                        padding: 1.5rem; border-radius: 12px; text-align: center;'>
-                <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
-                    Avec embeddings
-                </div>
-                <div style='color: white; font-size: 2rem; font-weight: 600;'>
-                    {embeddings_data.get("with_embeddings", 0)}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    latest_job = stats.get("latest_job")
+    if latest_job:
+        st.markdown("")
+        info_card(
+            "Dernière offre ingérée",
+            (
+                f"{latest_job.get('title', 'Offre récente')} chez "
+                f"{latest_job.get('company', 'Entreprise inconnue')} · "
+                f"{format_datetime(latest_job.get('date'), with_time=True)}"
+            ),
+            tone="gold",
         )
-
-    with col3:
-        st.markdown(
-            f"""
-            <div style='background: {GRADIENTS["blue"]}; 
-                        padding: 1.5rem; border-radius: 12px; text-align: center;'>
-                <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
-                    Sans embeddings
-                </div>
-                <div style='color: white; font-size: 2rem; font-weight: 600;'>
-                    {embeddings_data.get("without_embeddings", 0)}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col4:
-        percentage = embeddings_data.get("percentage_indexed", 0)
-        st.markdown(
-            f"""
-            <div style='background: {GRADIENTS["yellow"]}; 
-                        padding: 1.5rem; border-radius: 12px; text-align: center;'>
-                <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
-                    Taux d'indexation
-                </div>
-                <div style='color: white; font-size: 2rem; font-weight: 600;'>
-                    {percentage:.1f}%
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    # Répartition par source
-    if "by_source" in stats and stats["by_source"]:
-        st.markdown("---")
-        st.markdown(
-            f"""
-            <div style='background: {GRADIENTS["dark"]}; 
-                        padding: 1rem; border-radius: 12px; margin: 1rem 0;'>
-                <h4 style='color: white; margin: 0; border: none;'>📊 Répartition par source</h4>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        source_cols = st.columns(len(stats["by_source"]))
-        gradient_list = ["purple", "pink", "blue", "yellow"]
-
-        for idx, (source, count) in enumerate(stats["by_source"].items()):
-            gradient_key = gradient_list[idx % len(gradient_list)]
-            gradient = GRADIENTS[gradient_key]
-
-            # Sanitize source name to prevent XSS
-            safe_source = html.escape(source)
-
-            with source_cols[idx]:
-                st.markdown(
-                    f"""
-                    <div style='background: {gradient}; 
-                                padding: 1rem; border-radius: 12px; text-align: center;'>
-                        <div style='color: rgba(255,255,255,0.9); font-size: 0.85rem; margin-bottom: 0.5rem;'>
-                            {safe_source}
-                        </div>
-                        <div style='color: white; font-size: 1.5rem; font-weight: 600;'>
-                            {count}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )

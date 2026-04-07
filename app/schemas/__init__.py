@@ -3,6 +3,7 @@
 from app.schemas.common import HealthResponse, ErrorResponse, MessageResponse
 from app.schemas.match import MatchResponse, JobMatch
 from app.schemas.advice import AdviceRequest, AdviceResponse
+from app.schemas.chat import ChatResponse, ChatTurn
 from app.schemas.job import JobResponse, JobFilter, JobListResponse
 
 __all__ = [
@@ -13,6 +14,8 @@ __all__ = [
     "JobMatch",
     "AdviceRequest",
     "AdviceResponse",
+    "ChatResponse",
+    "ChatTurn",
     "JobResponse",
     "JobFilter",
     "JobListResponse",

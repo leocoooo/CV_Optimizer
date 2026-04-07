@@ -1,116 +1,251 @@
 """
-Composants de cards réutilisables pour l'interface.
+Composants de présentation réutilisables pour l'interface.
 """
 
+from __future__ import annotations
+
+from collections.abc import Sequence
+from textwrap import dedent
+
 import streamlit as st
-import html
-from ui.utils.config import GRADIENTS
+
+from ui.utils.formatters import escape_html
 
 
-def gradient_header(title: str, subtitle: str, gradient: str = "purple"):
-    """
-    Affiche un header avec gradient.
-
-    Args:
-        title: Titre principal
-        subtitle: Sous-titre
-        gradient: Type de gradient (purple, pink, blue, yellow, pastel, dark)
-    """
-    gradient_css = GRADIENTS.get(gradient, GRADIENTS["purple"])
-    text_color = "white" if gradient != "pastel" else "#333"
-
-    # Sanitize user inputs to prevent XSS
-    safe_title = html.escape(title)
-    safe_subtitle = html.escape(subtitle)
-
-    subtitle_color = "rgba(255,255,255,0.9)" if gradient != "pastel" else "rgba(51,51,51,0.85)"
-
-    st.markdown(
-        f"""
-        <div style='background: {gradient_css}; 
-                    padding: 2rem; border-radius: 12px; margin-bottom: 2rem;'>
-            <h1 style='color: {text_color}; margin: 0; border: none;'>{safe_title}</h1>
-            <p style='color: {subtitle_color}; margin: 0.5rem 0 0 0; font-size: 1.1rem;'>
-                {safe_subtitle}
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+def _render_html(markup: str) -> None:
+    """Rend un bloc HTML sans indentation parasite."""
+    cleaned = dedent(markup).strip()
+    normalized = "\n".join(
+        line.strip() if line.strip() else "" for line in cleaned.splitlines()
     )
+    st.markdown(normalized, unsafe_allow_html=True)
 
 
-def metric_card(label: str, value: str, gradient: str = "purple"):
-    """
-    Affiche une métrique dans une card colorée.
-
-    Args:
-        label: Label de la métrique
-        value: Valeur à afficher
-        gradient: Type de gradient (purple, pink, blue, yellow, pastel, dark)
-    """
-    gradient_css = GRADIENTS.get(gradient, GRADIENTS["purple"])
-
-    # Sanitize user inputs to prevent XSS
-    safe_label = html.escape(label)
-    safe_value = html.escape(value)
-
-    st.markdown(
+def render_app_topbar(title: str, subtitle: str) -> None:
+    """Affiche le bandeau léger en haut de page."""
+    _render_html(
         f"""
-        <div style='background: {gradient_css}; 
-                    padding: 1.5rem; border-radius: 12px; text-align: center;'>
-            <div style='color: rgba(255,255,255,0.9); font-size: 0.9rem; margin-bottom: 0.5rem;'>
-                {safe_label}
-            </div>
-            <div style='color: white; font-size: 2rem; font-weight: 600;'>
-                {safe_value}
+        <div class="app-topbar-shell">
+            <div class="app-topbar">
+                <div class="brand-lockup">
+                    <p class="brand-kicker">Workspace candidat</p>
+                    <p class="brand-title">{escape_html(title)}</p>
+                    <p class="brand-copy">{escape_html(subtitle)}</p>
+                </div>
+                <div class="brand-badge">Interface professionnelle</div>
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
-def info_card(title: str, content: str, gradient: str = "purple"):
-    """
-    Affiche une card d'information avec titre et contenu.
+def marketing_hero(
+    eyebrow: str,
+    title_lead: str,
+    title_highlight: str,
+    title_tail: str,
+    subtitle: str,
+    pills: Sequence[str] | None = None,
+) -> None:
+    """Affiche un hero centre de style landing page."""
+    pill_markup = ""
+    if pills:
+        pill_markup = "".join(
+            f'<span class="hero-badge">{escape_html(pill)}</span>' for pill in pills if pill
+        )
 
-    Args:
-        title: Titre de la card
-        content: Contenu de la card (peut être vide)
-        gradient: Type de gradient (purple, pink, blue, yellow, pastel, dark)
-    """
-    gradient_css = GRADIENTS.get(gradient, GRADIENTS["purple"])
-
-    # Sanitize user input to prevent XSS
-    safe_title = html.escape(title)
-
-    st.markdown(
+    _render_html(
         f"""
-        <div style='background: {gradient_css}; 
-                    padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;'>
-            <h3 style='color: white; margin: 0; border: none;'>{safe_title}</h3>
-        </div>
-        """,
-        unsafe_allow_html=True,
+        <section class="marketing-hero">
+            <p class="marketing-eyebrow">{escape_html(eyebrow)}</p>
+            <h1 class="marketing-title">
+                {escape_html(title_lead)}
+                <span>{escape_html(title_highlight)}</span>
+                {escape_html(title_tail)}
+            </h1>
+            <p class="marketing-copy">{escape_html(subtitle)}</p>
+            {"<div class='marketing-badges'>" + pill_markup + "</div>" if pill_markup else ""}
+        </section>
+        """
     )
 
 
-def status_message(message: str, status: str = "success"):
-    """
-    Affiche un message de statut stylisé.
+def hero_banner(
+    title: str,
+    subtitle: str,
+    eyebrow: str = "CV-Optimizer",
+    pills: Sequence[str] | None = None,
+) -> None:
+    """Affiche un hero principal."""
+    pill_markup = ""
+    if pills:
+        pill_markup = "".join(
+            f'<span class="pill">{escape_html(pill)}</span>' for pill in pills if pill
+        )
 
-    Args:
-        message: Message à afficher
-        status: Type de statut (success, error, warning)
-    """
-    # Sanitize user input to prevent XSS
-    safe_message = html.escape(message)
-
-    st.markdown(
+    _render_html(
         f"""
-        <div class='status-badge status-{status}' style='padding: 1rem; font-size: 1rem; margin: 1rem 0;'>
-            {safe_message}
-        </div>
-        """,
-        unsafe_allow_html=True,
+        <section class="hero-panel">
+            <p class="hero-eyebrow">{escape_html(eyebrow)}</p>
+            <h1 class="hero-title">{escape_html(title)}</h1>
+            <p class="hero-copy">{escape_html(subtitle)}</p>
+            {"<div class='pill-row'>" + pill_markup + "</div>" if pill_markup else ""}
+        </section>
+        """
     )
+
+
+def section_intro(title: str, subtitle: str = "") -> None:
+    """Affiche un titre de section compact."""
+    _render_html(
+        f"""
+        <div class="section-heading">
+            <h2 class="section-title">{escape_html(title)}</h2>
+            {f"<p class='section-copy'>{escape_html(subtitle)}</p>" if subtitle else ""}
+        </div>
+        """
+    )
+
+
+def metric_card(label: str, value: str, detail: str = "", tone: str = "") -> None:
+    """Affiche une carte de métrique."""
+    tone_class = f" {tone}" if tone else ""
+    _render_html(
+        f"""
+        <div class="metric-card{tone_class}">
+            <p class="metric-label">{escape_html(label)}</p>
+            <p class="metric-value">{escape_html(value)}</p>
+            {f"<p class='metric-detail'>{escape_html(detail)}</p>" if detail else ""}
+        </div>
+        """
+    )
+
+
+def metric_row(metrics: Sequence[dict[str, str]]) -> None:
+    """Affiche une ligne de métriques."""
+    if not metrics:
+        return
+
+    columns = st.columns(len(metrics))
+    for column, metric in zip(columns, metrics):
+        with column:
+            metric_card(
+                metric.get("label", ""),
+                metric.get("value", ""),
+                metric.get("detail", ""),
+                metric.get("tone", ""),
+            )
+
+
+def info_card(title: str, content: str, tone: str = "sage") -> None:
+    """Affiche un bloc d'information."""
+    body = escape_html(content).replace("\n", "<br>")
+    _render_html(
+        f"""
+        <div class="info-card {escape_html(tone)}">
+            <p class="info-title">{escape_html(title)}</p>
+            {f"<p class='info-body'>{body}</p>" if content else ""}
+        </div>
+        """
+    )
+
+
+def status_message(message: str, status: str = "success") -> None:
+    """Affiche une bannière de statut."""
+    css_class = {
+        "success": "status-success",
+        "warning": "status-warning",
+        "error": "status-error",
+    }.get(status, "status-success")
+
+    _render_html(
+        f"""
+        <div class="status-banner {css_class}">
+            {escape_html(message)}
+        </div>
+        """
+    )
+
+
+def tag_cloud(tags: Sequence[str], tone: str = "") -> None:
+    """Affiche un nuage de tags."""
+    items = [tag for tag in tags if tag]
+    if not items:
+        return
+
+    tone_class = f" {tone}" if tone else ""
+    tag_markup = "".join(
+        f'<span class="tag{tone_class}">{escape_html(tag)}</span>' for tag in items
+    )
+    _render_html(f'<div class="tag-cloud">{tag_markup}</div>')
+
+
+def timeline(steps: Sequence[tuple[str, str]]) -> None:
+    """Affiche une timeline verticale."""
+    if not steps:
+        return
+
+    step_markup: list[str] = []
+    for index, (title, copy) in enumerate(steps, start=1):
+        step_markup.append(
+            "<div class='timeline-step'>"
+            f"<div class='timeline-index'>{index}</div>"
+            "<div class='timeline-content'>"
+            f"<p class='timeline-title'>{escape_html(title)}</p>"
+            f"<p class='timeline-copy'>{escape_html(copy)}</p>"
+            "</div>"
+            "</div>"
+        )
+
+    _render_html(
+        "<div class='surface-card timeline-shell'>"
+        "<div class='timeline'>"
+        + "".join(step_markup)
+        + "</div></div>"
+    )
+
+
+def empty_state(title: str, copy: str) -> None:
+    """Affiche un état vide."""
+    info_card(title, copy, tone="gold")
+
+
+def job_card(
+    title: str,
+    company: str,
+    meta: Sequence[str],
+    description: str = "",
+    score_label: str | None = None,
+    score_class: str = "high",
+) -> None:
+    """Affiche une carte d'offre synthétique."""
+    meta_markup = "".join(
+        f'<span class="tag">{escape_html(item)}</span>' for item in meta if item
+    )
+    score_markup = ""
+    if score_label:
+        css_class = "score-pill"
+        if score_class == "medium":
+            css_class += " medium"
+        if score_class == "low":
+            css_class += " low"
+        score_markup = f'<div class="{css_class}">{escape_html(score_label)}</div>'
+
+    body_parts = [
+        "<div class='surface-card job-card'>",
+        "<div class='job-header'>",
+        "<div class='job-main'>",
+        f"<p class='job-company'>{escape_html(company)}</p>",
+        f"<h3 class='job-title'>{escape_html(title)}</h3>",
+        "</div>",
+        score_markup,
+        "</div>",
+    ]
+
+    if meta_markup:
+        body_parts.append(f"<div class='tag-cloud job-meta-row'>{meta_markup}</div>")
+    if description:
+        body_parts.append(f"<p class='job-description'>{escape_html(description)}</p>")
+
+    body_parts.append("</div>")
+    _render_html("".join(body_parts))

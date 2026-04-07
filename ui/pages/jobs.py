@@ -1,314 +1,351 @@
 """
-Page de recherche d'offres d'emploi.
+Page de recherche et d'exploration des offres.
 """
 
+from __future__ import annotations
+
 import streamlit as st
-from datetime import datetime
-from ui.utils.api_client import APIClient
-from ui.utils.config import DEFAULT_PAGE_SIZE, DEFAULT_DAYS_LIMIT
-from ui.components.cards import gradient_header, metric_card, status_message
+
+from ui.components.cards import (
+    empty_state,
+    hero_banner,
+    info_card,
+    metric_row,
+    section_intro,
+    status_message,
+)
+from ui.utils.config import DEFAULT_DAYS_LIMIT, DEFAULT_PAGE_SIZE
+from ui.utils.formatters import compact_number, format_datetime, split_csv, truncate
+from ui.utils.navigation import go_to_page
 
 
-def render(api_client: APIClient, api_status: bool):
-    """Affiche la page de recherche d'offres."""
-    gradient_header(
-        "💼 Recherche d'offres d'emploi",
-        "Parcourez et filtrez les offres disponibles dans la base de données",
-        gradient="blue",
+def _default_job_filters() -> dict[str, str | int]:
+    return {
+        "keywords": st.session_state.get("jobs_prefill_keywords", ""),
+        "location": "",
+        "contract_type": "",
+        "experience": "Tous",
+        "source": "Toutes",
+        "sector": "",
+        "remote_mode": "",
+        "company": "",
+        "required_education": "",
+        "page": 1,
+        "page_size": DEFAULT_PAGE_SIZE,
+        "days_limit": DEFAULT_DAYS_LIMIT,
+    }
+
+
+def _run_search(api_client, filters: dict[str, str | int]) -> tuple[dict | None, str | None]:
+    experience = filters["experience"]
+    if experience == "Tous":
+        experience = None
+    elif isinstance(experience, str):
+        experience = experience[:1]
+
+    source = filters["source"]
+    if source == "Toutes":
+        source = None
+
+    try:
+        data = api_client.search_jobs(
+            page=int(filters["page"]),
+            page_size=int(filters["page_size"]),
+            keywords=str(filters["keywords"]).strip() or None,
+            location=str(filters["location"]).strip() or None,
+            contract_type=str(filters["contract_type"]).strip() or None,
+            experience=experience,
+            source=source,
+            sector=str(filters["sector"]).strip() or None,
+            remote_mode=str(filters["remote_mode"]).strip() or None,
+            company=str(filters["company"]).strip() or None,
+            required_education=str(filters["required_education"]).strip() or None,
+            days_limit=int(filters["days_limit"]),
+        )
+        return data, None
+    except Exception as exc:
+        return None, str(exc)
+
+
+def _render_job_result(job: dict) -> None:
+    """Affiche une offre en layout natif Streamlit."""
+    meta = [
+        job.get("location") or "Lieu non precise",
+        job.get("contract_type") or "Contrat non precise",
+        job.get("source") or "Source inconnue",
+        format_datetime(job.get("date_publication")),
+    ]
+    tags = (
+        split_csv(job.get("hard_skills"))
+        + split_csv(job.get("soft_skills"), limit=3)
+        + split_csv(job.get("languages"), limit=2)
     )
 
-    # Message d'aide pour l'utilisateur
-    st.info(
-        """
-        💡 **Comment utiliser la recherche :**
-        - Laissez tous les champs vides pour voir toutes les offres récentes
-        - Ajoutez des filtres pour affiner votre recherche
-        - Utilisez les mots-clés pour rechercher dans les titres et descriptions
-        - Le filtre "Offres des N derniers jours" s'applique à la **date de publication** (ou date de collecte si date de pub. manquante)
-        """
-    )
+    with st.container(border=True):
+        summary_col, action_col = st.columns([1.55, 0.85], gap="large")
 
-    # === FILTRES PRINCIPAUX ===
-    col1, col2, col3 = st.columns(3)
+        with summary_col:
+            st.caption(job.get("company", "Entreprise"))
+            st.markdown(f"#### {job.get('title', 'Offre')}")
+            st.caption(" · ".join(item for item in meta if item))
 
-    with col1:
-        keywords = st.text_input("Mots-clés", placeholder="ex: Python, Data")
-        location = st.text_input("Localisation", placeholder="ex: Paris")
+            description = truncate(job.get("description"), limit=240)
+            if description:
+                st.write(description)
 
-    with col2:
-        contract_type = st.text_input("Type de contrat", placeholder="ex: CDI")
-        experience = st.selectbox(
-            "Expérience",
-            ["Tous", "D (Débutant)", "E (Expérimenté)", "S (Senior)"],
-        )
-        if experience == "Tous":
-            experience = None
-        else:
-            experience = experience[0]
+            if tags:
+                st.caption("Competences reperees")
+                st.write(" · ".join(tags[:8]))
 
-    with col3:
-        source = st.selectbox(
-            "Source",
-            ["Aucun filtre", "France Travail", "HelloWork", "Welcome to the Jungle"],
-        )
-        if source == "Aucun filtre":
-            source = None
-
-        days_limit = st.slider(
-            "Offres des N derniers jours",
-            min_value=7,
-            max_value=365,
-            value=DEFAULT_DAYS_LIMIT,
-        )
-
-    # === FILTRES AVANCÉS ===
-    # Initialisation des valeurs par défaut
-    sector = None
-    remote_mode = None
-    company = None
-    education = None
-
-    with st.expander("⚙️ Filtres avancés"):
-        col1, col2 = st.columns(2)
-
-        with col1:
-            sector = st.text_input("Secteur d'activité", placeholder="ex: IT, Finance")
-            if not sector:
-                sector = None
-            company = st.text_input("Entreprise", placeholder="ex: Google")
-            if not company:
-                company = None
-
-        with col2:
-            remote_mode = st.text_input(
-                "Mode télétravail", placeholder="ex: Hybride, 100% remote"
-            )
-            if not remote_mode:
-                remote_mode = None
-            education = st.text_input("Niveau d'études", placeholder="ex: Bac+5")
-            if not education:
-                education = None
-
-    # === PAGINATION ===
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        page_num = st.number_input("Page", min_value=1, value=1)
-    with col2:
-        page_size = st.slider(
-            "Résultats par page",
-            min_value=10,
-            max_value=100,
-            value=DEFAULT_PAGE_SIZE,
-            step=10,
-        )
-
-    if st.button("🔍 Rechercher", type="primary", disabled=not api_status):
-        with st.spinner("Recherche en cours..."):
-            try:
-                data = api_client.search_jobs(
-                    page=page_num,
-                    page_size=page_size,
-                    keywords=keywords if keywords else None,
-                    location=location if location else None,
-                    contract_type=contract_type if contract_type else None,
-                    experience=experience,
-                    source=source if source else None,
-                    sector=sector if sector else None,
-                    remote_mode=remote_mode if remote_mode else None,
-                    company=company if company else None,
-                    required_education=education if education else None,
-                    days_limit=days_limit,
+        with action_col:
+            st.caption("Actions")
+            if job.get("url"):
+                st.link_button(
+                    "Voir l'offre source",
+                    job["url"],
+                    use_container_width=True,
                 )
+            if st.button(
+                "Analyser avec le coach IA",
+                key=f"jobs_advice_{job['id']}",
+                use_container_width=True,
+            ):
+                st.session_state.preselected_job_id = job["id"]
+                go_to_page("advice")
 
-                # Gestion du cas "0 résultats"
-                if data["total"] == 0:
-                    st.warning(
-                        "🔍 Aucune offre ne correspond à vos critères de recherche."
+        with st.expander(f"Details de l'offre · {job['id']}"):
+            detail_col1, detail_col2 = st.columns([1.35, 1], gap="large")
+            with detail_col1:
+                st.markdown(f"**Entreprise**: {job.get('company', 'Non renseignee')}")
+                st.markdown(f"**Localisation**: {job.get('location', 'Non renseignee')}")
+                st.markdown(f"**Teletravail**: {job.get('remote_mode', 'Non renseigne')}")
+                st.markdown(f"**Salaire**: {job.get('salary', 'Non renseigne')}")
+                st.markdown(
+                    f"**Experience**: {job.get('required_experience', 'Non renseignee')}"
+                )
+                st.markdown(
+                    f"**Etudes**: {job.get('required_education', 'Non renseigne')}"
+                )
+                st.markdown(f"**Publication**: {format_datetime(job.get('date_publication'))}")
+
+            with detail_col2:
+                st.markdown("**Source et actions**")
+                st.write(job.get("source") or "Source inconnue")
+                if job.get("url"):
+                    st.link_button(
+                        "Ouvrir la fiche source",
+                        job["url"],
+                        use_container_width=True,
                     )
+                if st.button(
+                    "Envoyer au coach IA",
+                    key=f"jobs_advice_detail_{job['id']}",
+                    use_container_width=True,
+                ):
+                    st.session_state.preselected_job_id = job["id"]
+                    go_to_page("advice")
 
-                    # Suggestions pour améliorer la recherche
-                    st.info(
-                        """
-                        💡 **Suggestions pour améliorer votre recherche :**
-                        - Essayez d'élargir la période de recherche (augmentez le nombre de jours)
-                        - Retirez certains filtres pour obtenir plus de résultats
-                        - Vérifiez l'orthographe de vos mots-clés
-                        - Essayez des termes plus généraux (ex: "Data" au lieu de "Data Scientist")
-                        """
-                    )
-                else:
-                    status_message(f"✅ {data['total']} offres trouvées", "success")
+            st.markdown("**Description**")
+            st.write(job.get("description", "Description indisponible"))
 
-                    # Métriques
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        metric_card("Total", str(data["total"]), "purple")
-                    with col2:
-                        metric_card(
-                            "Page", f"{data['page']}/{data['total_pages']}", "pink"
-                        )
-                    with col3:
-                        metric_card("Résultats", str(len(data["jobs"])), "blue")
 
-                    st.markdown("---")
+def render(api_client, api_status: bool) -> None:
+    """Affiche la page Explorer."""
+    hero_banner(
+        "Explorer les offres avec une lecture plus claire du marché.",
+        (
+            "Filtres avancés, résultats mieux hiérarchisés et passerelles directes "
+            "vers le coaching IA pour transformer une offre en cible de candidature."
+        ),
+        eyebrow="Explorer le marché",
+        pills=["Filtres structurés", "Lecture rapide des signaux", "Pont direct vers les conseils IA"],
+    )
 
-                    for i, job in enumerate(data["jobs"], 1):
-                        with st.expander(
-                            f"#{(page_num - 1) * page_size + i} · {job['title']} · {job['company']}"
-                        ):
-                            # En-tête avec infos essentielles
-                            col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    if "jobs_filters" not in st.session_state:
+        st.session_state.jobs_filters = _default_job_filters()
+    prefill_keywords = st.session_state.pop("jobs_prefill_keywords", None)
+    if prefill_keywords:
+        st.session_state.jobs_filters["keywords"] = prefill_keywords
+    if "jobs_results" not in st.session_state and api_status:
+        data, error = _run_search(api_client, st.session_state.jobs_filters)
+        if data:
+            st.session_state.jobs_results = data
+        elif error:
+            st.session_state.jobs_error = error
 
-                            with col1:
-                                st.markdown(f"### {job['company']}")
-                                if job.get("company_size"):
-                                    st.caption(
-                                        f"Taille: {job.get('company_size', 'N/A')}"
-                                    )
+    filters = st.session_state.jobs_filters
 
-                            with col2:
-                                if job.get("contract_type"):
-                                    st.markdown(f"**{job['contract_type']}**")
+    with st.form("jobs_search_form"):
+        section_intro(
+            "Filtres de recherche",
+            "Gardez une recherche large ou resserrez progressivement le marché.",
+        )
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            keywords = st.text_input("Mots-clés", value=str(filters["keywords"]))
+            location = st.text_input("Localisation", value=str(filters["location"]))
+            sector = st.text_input("Secteur", value=str(filters["sector"]))
+        with col2:
+            contract_type = st.text_input(
+                "Type de contrat", value=str(filters["contract_type"])
+            )
+            experience = st.selectbox(
+                "Niveau d'expérience",
+                ["Tous", "D (Débutant)", "E (Expérimenté)", "S (Senior)"],
+                index=["Tous", "D (Débutant)", "E (Expérimenté)", "S (Senior)"].index(
+                    str(filters["experience"])
+                ),
+            )
+            remote_mode = st.text_input(
+                "Télétravail", value=str(filters["remote_mode"])
+            )
+        with col3:
+            source = st.selectbox(
+                "Source",
+                ["Toutes", "France Travail", "HelloWork", "Welcome to the Jungle"],
+                index=[
+                    "Toutes",
+                    "France Travail",
+                    "HelloWork",
+                    "Welcome to the Jungle",
+                ].index(str(filters["source"])),
+            )
+            company = st.text_input("Entreprise", value=str(filters["company"]))
+            required_education = st.text_input(
+                "Études requises", value=str(filters["required_education"])
+            )
 
-                            with col3:
-                                if job.get("salary"):
-                                    st.markdown(f"💰 {job['salary']}")
+        page_col, size_col, days_col = st.columns([1, 1, 2])
+        with page_col:
+            page = st.number_input("Page", min_value=1, value=int(filters["page"]))
+        with size_col:
+            page_size = st.selectbox(
+                "Résultats / page",
+                [12, 24, 36, 48],
+                index=[12, 24, 36, 48].index(int(filters["page_size"])),
+            )
+        with days_col:
+            days_limit = st.slider(
+                "Offres des N derniers jours",
+                min_value=7,
+                max_value=365,
+                value=int(filters["days_limit"]),
+            )
 
-                            with col4:
-                                if job.get("source"):
-                                    st.caption(f"📍 {job['source']}")
+        submit = st.form_submit_button(
+            "Actualiser l'exploration",
+            use_container_width=True,
+            disabled=not api_status,
+        )
 
-                            st.divider()
+    if submit and api_status:
+        st.session_state.jobs_filters = {
+            "keywords": keywords,
+            "location": location,
+            "contract_type": contract_type,
+            "experience": experience,
+            "source": source,
+            "sector": sector,
+            "remote_mode": remote_mode,
+            "company": company,
+            "required_education": required_education,
+            "page": int(page),
+            "page_size": int(page_size),
+            "days_limit": int(days_limit),
+        }
+        with st.spinner("Exploration des offres en cours..."):
+            data, error = _run_search(api_client, st.session_state.jobs_filters)
+        if data:
+            st.session_state.jobs_results = data
+            st.session_state.jobs_error = None
+        else:
+            st.session_state.jobs_error = error
+    elif prefill_keywords and api_status:
+        with st.spinner("Chargement des offres liées au contexte sélectionné..."):
+            data, error = _run_search(api_client, st.session_state.jobs_filters)
+        if data:
+            st.session_state.jobs_results = data
+            st.session_state.jobs_error = None
+        else:
+            st.session_state.jobs_error = error
 
-                            # Infos localisation et profil
-                            col1, col2, col3 = st.columns(3)
+    if not api_status:
+        info_card(
+            "Exploration indisponible",
+            "La recherche sera réactivée dès que l'API pourra répondre aux appels `/api/jobs`.",
+            tone="gold",
+        )
+        return
 
-                            with col1:
-                                if job.get("location"):
-                                    st.markdown(
-                                        f"**📍 Localisation**\n{job['location']}"
-                                    )
+    if st.session_state.get("jobs_error"):
+        status_message(f"Erreur API: {st.session_state['jobs_error']}", "error")
 
-                            with col2:
-                                if job.get("required_experience"):
-                                    st.markdown(
-                                        f"**📈 Expérience**\n{job['required_experience']}"
-                                    )
+    data = st.session_state.get("jobs_results")
+    if not data:
+        empty_state(
+            "Aucun résultat chargé",
+            "Lancez une recherche pour voir remonter les offres disponibles dans la base.",
+        )
+        return
 
-                            with col3:
-                                if job.get("remote_mode"):
-                                    st.markdown(
-                                        f"**🏠 Télétravail**\n{job['remote_mode']}"
-                                    )
-                                if job.get("sector"):
-                                    st.markdown(f"**🏢 Secteur**\n{job['sector']}")
-                                if job.get("required_education"):
-                                    st.markdown(
-                                        f"**🎓 Études**\n{job['required_education']}"
-                                    )
+    status_message(f"{data['total']} offres correspondent aux filtres actifs.", "success")
+    metric_row(
+        [
+            {
+                "label": "Résultats trouvés",
+                "value": compact_number(data["total"]),
+                "detail": "Volume total correspondant",
+                "tone": "accent",
+            },
+            {
+                "label": "Page courante",
+                "value": f"{data['page']} / {max(data['total_pages'], 1)}",
+                "detail": "Pagination active",
+                "tone": "sage",
+            },
+            {
+                "label": "Fenêtre temporelle",
+                "value": f"{st.session_state.jobs_filters['days_limit']} jours",
+                "detail": "Période d'exploration",
+                "tone": "gold",
+            },
+        ]
+    )
 
-                            st.divider()
+    active_tags = []
+    for key in [
+        "keywords",
+        "location",
+        "contract_type",
+        "sector",
+        "remote_mode",
+        "company",
+        "required_education",
+    ]:
+        value = st.session_state.jobs_filters.get(key)
+        if value:
+            active_tags.append(f"{key.replace('_', ' ')}: {value}")
+    if str(st.session_state.jobs_filters.get("experience")) != "Tous":
+        active_tags.append(f"expérience: {st.session_state.jobs_filters['experience']}")
+    if str(st.session_state.jobs_filters.get("source")) != "Toutes":
+        active_tags.append(f"source: {st.session_state.jobs_filters['source']}")
 
-                            # Compétences et langues
-                            if (
-                                job.get("hard_skills")
-                                or job.get("soft_skills")
-                                or job.get("languages")
-                            ):
-                                col1, col2, col3 = st.columns(3)
+    if active_tags:
+        section_intro("Filtres actifs", "Les critères actuellement appliqués à la base.")
+        st.caption(" · ".join(active_tags))
 
-                                with col1:
-                                    if job.get("hard_skills"):
-                                        st.markdown("**🔧 Compétences techniques**")
-                                        st.caption(
-                                            job["hard_skills"][:200]
-                                            + (
-                                                "..."
-                                                if len(job.get("hard_skills", "")) > 200
-                                                else ""
-                                            )
-                                        )
+    section_intro(
+        "Résultats",
+        "Chaque carte peut être utilisée comme point d'entrée vers un matching ciblé ou un diagnostic IA.",
+    )
 
-                                with col2:
-                                    if job.get("soft_skills"):
-                                        st.markdown("**💬 Soft skills**")
-                                        st.caption(
-                                            job["soft_skills"][:200]
-                                            + (
-                                                "..."
-                                                if len(job.get("soft_skills", "")) > 200
-                                                else ""
-                                            )
-                                        )
+    if data["total"] == 0:
+        empty_state(
+            "Aucune offre trouvée",
+            "Élargissez la période ou retirez quelques filtres pour retrouver plus de volume.",
+        )
+        return
 
-                                with col3:
-                                    if job.get("languages"):
-                                        st.markdown("**🗣️ Langues**")
-                                        st.caption(job["languages"])
-
-                                st.divider()
-
-                            # Description du poste
-                            if job.get("description"):
-                                st.markdown("**📝 Description du poste**")
-                                st.markdown(
-                                    job["description"][:500]
-                                    + (
-                                        "..."
-                                        if len(job.get("description", "")) > 500
-                                        else ""
-                                    )
-                                )
-
-                            # Profil demandé
-                            if job.get("job_profile"):
-                                st.markdown("**👤 Profil demandé**")
-                                st.markdown(
-                                    job["job_profile"][:300]
-                                    + (
-                                        "..."
-                                        if len(job.get("job_profile", "")) > 300
-                                        else ""
-                                    )
-                                )
-
-                            st.divider()
-
-                            # Dates et actions
-                            col1, col2, col3, col4 = st.columns(4)
-
-                            with col1:
-                                if job.get("date_publication"):
-                                    date_pub = job["date_publication"]
-                                    if isinstance(date_pub, str):
-                                        date_pub = datetime.fromisoformat(
-                                            date_pub.replace("Z", "+00:00")
-                                        )
-                                    st.caption(
-                                        f"📅 Pub: {date_pub.strftime('%d/%m/%Y')}"
-                                    )
-
-                            with col2:
-                                if job.get("date_scraping"):
-                                    date_scrap = job["date_scraping"]
-                                    if isinstance(date_scrap, str):
-                                        date_scrap = datetime.fromisoformat(
-                                            date_scrap.replace("Z", "+00:00")
-                                        )
-                                    st.caption(
-                                        f"📥 Ajout: {date_scrap.strftime('%d/%m/%Y')}"
-                                    )
-
-                            with col3:
-                                st.caption(f"🆔 `{job['id'][:8]}...`")
-
-                            with col4:
-                                if job.get("url"):
-                                    st.link_button(
-                                        "🔗 Voir l'offre",
-                                        job["url"],
-                                        use_container_width=True,
-                                    )
-
-            except Exception as e:
-                st.error(f"❌ Erreur lors de la requête: {str(e)}")
+    for job in data["jobs"]:
+        _render_job_result(job)
+        st.markdown("")

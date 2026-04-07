@@ -2,8 +2,10 @@
 Client API centralisé pour toutes les requêtes vers le backend.
 """
 
+import json
+from typing import Any, Dict, List, Optional
+
 import requests
-from typing import Optional, Dict, Any, List
 
 
 class APIClient:
@@ -21,6 +23,24 @@ class APIClient:
         except Exception:
             return False
 
+    def get_status(self) -> Dict[str, Any]:
+        """Récupère le statut détaillé de l'API."""
+        response = requests.get(f"{self.base_url}/api/status", timeout=10)
+        response.raise_for_status()
+        return response.json()
+
+    def get_dashboard(self) -> Dict[str, Any]:
+        """Récupère les métriques agrégées du cockpit."""
+        response = requests.get(f"{self.base_url}/api/dashboard", timeout=10)
+        response.raise_for_status()
+        return response.json()
+
+    def get_job_details(self, job_id: str) -> Dict[str, Any]:
+        """Récupère la fiche complète d'une offre."""
+        response = requests.get(f"{self.base_url}/api/jobs/{job_id}", timeout=10)
+        response.raise_for_status()
+        return response.json()
+
     def match_cv(
         self,
         file_content: bytes,
@@ -34,35 +54,23 @@ class APIClient:
         """
         Matche un CV avec les offres d'emploi.
 
-        Args:
-            file_content: Contenu du fichier PDF
-            filename: Nom du fichier
-            top_n: Nombre de résultats
-            days_limit: Limiter aux N derniers jours
-            location: Localisation souhaitée
-            contract_type: Type de contrat
-            experience: Niveau d'expérience
-
-        Returns:
-            Résultats du matching
-
-        Raises:
-            requests.HTTPError: Si la requête échoue
+        Les paramètres sont envoyés dans le formulaire multipart pour correspondre
+        aux champs FastAPI déclarés en `Form(...)`.
         """
-        params: Dict[str, Any] = {"top_n": top_n, "days_limit": days_limit}
+        payload: Dict[str, Any] = {"top_n": top_n, "days_limit": days_limit}
         if location:
-            params["location"] = location
+            payload["location"] = location
         if contract_type:
-            params["contract_type"] = contract_type
+            payload["contract_type"] = contract_type
         if experience:
-            params["experience"] = experience
+            payload["experience"] = experience
 
         files = {"file": (filename, file_content, "application/pdf")}
 
         response = requests.post(
             f"{self.base_url}/api/match",
             files=files,
-            params=params,
+            data=payload,
             timeout=self.timeout,
         )
         response.raise_for_status()
@@ -83,26 +91,7 @@ class APIClient:
         required_education: Optional[str] = None,
         days_limit: int = 30,
     ) -> Dict[str, Any]:
-        """
-        Recherche des offres d'emploi avec filtres avancés.
-
-        Args:
-            page: Numéro de page
-            page_size: Taille de page
-            keywords: Mots-clés de recherche
-            location: Localisation
-            contract_type: Type de contrat
-            experience: Niveau d'expérience
-            source: Source de l'offre
-            sector: Secteur d'activité
-            remote_mode: Mode de télétravail
-            company: Entreprise
-            required_education: Niveau d'études requis
-            days_limit: Offres des N derniers jours
-
-        Returns:
-            Résultats de la recherche
-        """
+        """Recherche des offres d'emploi avec filtres avancés."""
         params: Dict[str, Any] = {
             "page": page,
             "page_size": page_size,
@@ -135,22 +124,50 @@ class APIClient:
     def get_advice(
         self, file_content: bytes, filename: str, job_id: str
     ) -> Dict[str, Any]:
-        """
-        Obtient des conseils LLM pour un CV et une offre.
-
-        Args:
-            file_content: Contenu du fichier PDF
-            filename: Nom du fichier
-            job_id: ID de l'offre ciblée
-
-        Returns:
-            Conseils du LLM
-        """
+        """Obtient des conseils LLM pour un CV et une offre."""
         files = {"file": (filename, file_content, "application/pdf")}
         data = {"job_id": job_id}
 
         response = requests.post(
             f"{self.base_url}/api/advice", files=files, data=data, timeout=70
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def compare_skills(
+        self, file_content: bytes, filename: str, job_id: str
+    ) -> Dict[str, Any]:
+        """Compare les compétences visibles dans un CV avec celles d'une offre."""
+        files = {"file": (filename, file_content, "application/pdf")}
+        data = {"job_id": job_id}
+
+        response = requests.post(
+            f"{self.base_url}/api/skills/compare", files=files, data=data, timeout=45
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def chat_with_llm(
+        self,
+        file_content: bytes,
+        filename: str,
+        job_id: str,
+        message: str,
+        history: List[Dict[str, str]] | None = None,
+    ) -> Dict[str, Any]:
+        """Ouvre une discussion avec le coach LLM contextualisé."""
+        files = {"file": (filename, file_content, "application/pdf")}
+        data = {
+            "job_id": job_id,
+            "message": message,
+            "history": json.dumps(history or [], ensure_ascii=False),
+        }
+
+        response = requests.post(
+            f"{self.base_url}/api/chat",
+            files=files,
+            data=data,
+            timeout=90,
         )
         response.raise_for_status()
         return response.json()
@@ -162,18 +179,7 @@ class APIClient:
         max_offers: int = 10,
         enable_scraping: bool = True,
     ) -> Dict[str, Any]:
-        """
-        Lance la collecte d'offres (admin).
-
-        Args:
-            api_key: Clé API admin
-            keywords: Liste de mots-clés
-            max_offers: Nombre max d'offres par mot-clé
-            enable_scraping: Activer le scraping web
-
-        Returns:
-            Confirmation de lancement
-        """
+        """Lance la collecte d'offres (admin)."""
         headers = {"X-API-Key": api_key}
         payload = {
             "keywords": keywords,
@@ -191,15 +197,7 @@ class APIClient:
         return response.json()
 
     def reindex_embeddings(self, api_key: str) -> Dict[str, Any]:
-        """
-        Réindexe les embeddings (admin).
-
-        Args:
-            api_key: Clé API admin
-
-        Returns:
-            Confirmation de lancement
-        """
+        """Réindexe les embeddings (admin)."""
         headers = {"X-API-Key": api_key}
 
         response = requests.post(
@@ -209,15 +207,7 @@ class APIClient:
         return response.json()
 
     def get_stats(self, api_key: str) -> Dict[str, Any]:
-        """
-        Récupère les statistiques de la base (admin).
-
-        Args:
-            api_key: Clé API admin
-
-        Returns:
-            Statistiques détaillées
-        """
+        """Récupère les statistiques de la base (admin)."""
         headers = {"X-API-Key": api_key}
 
         response = requests.get(

@@ -2,31 +2,57 @@
 Page de matching CV avec offres d'emploi.
 """
 
+from __future__ import annotations
+
 import streamlit as st
-import html
-from ui.utils.api_client import APIClient
-from ui.utils.config import DEFAULT_TOP_N, DEFAULT_DAYS_LIMIT, MAX_TOP_N
-from ui.components.cards import gradient_header, metric_card, status_message, info_card
+
+from ui.components.cards import (
+    empty_state,
+    hero_banner,
+    info_card,
+    job_card,
+    metric_row,
+    section_intro,
+    status_message,
+    timeline,
+)
 from ui.components.file_helpers import cv_uploader
+from ui.utils.config import DEFAULT_DAYS_LIMIT, DEFAULT_TOP_N, MAX_TOP_N
+from ui.utils.formatters import format_datetime, score_badge
+from ui.utils.navigation import go_to_page
 
 
-def render(api_client: APIClient, api_status: bool):
+def render(api_client, api_status: bool) -> None:
     """Affiche la page de matching CV."""
-    gradient_header(
-        "🎯 Matching CV avec offres d'emploi",
-        "Uploadez votre CV pour trouver les offres les plus pertinentes",
-        gradient="purple",
+    hero_banner(
+        "Transformez un CV en shortlist exploitable.",
+        (
+            "Chargez un PDF, affinez le périmètre de recherche et obtenez les postes "
+            "les plus pertinents pour votre profil sans quitter l'interface."
+        ),
+        eyebrow="Matching CV",
+        pills=["Upload PDF", "Scoring sémantique", "Passerelle vers les conseils IA"],
     )
 
-    col1, col2 = st.columns([2, 1])
+    left_col, right_col = st.columns([1.45, 1], gap="large")
 
-    with col1:
+    with left_col:
+        section_intro(
+            "Document candidat",
+            "Le fichier envoyé est relu par l'API puis comparé aux embeddings de la base.",
+        )
         uploaded_file = cv_uploader(key="matching_cv")
 
-    with col2:
-        info_card("⚙️ Paramètres", "", gradient="pink")
+    with right_col:
+        section_intro(
+            "Périmètre d'analyse",
+            "Réduisez le bruit si vous ciblez une zone ou un type de contrat précis.",
+        )
         top_n = st.slider(
-            "Nombre de résultats", min_value=5, max_value=MAX_TOP_N, value=DEFAULT_TOP_N
+            "Nombre de résultats",
+            min_value=5,
+            max_value=MAX_TOP_N,
+            value=DEFAULT_TOP_N,
         )
         days_limit = st.slider(
             "Offres des N derniers jours",
@@ -34,144 +60,139 @@ def render(api_client: APIClient, api_status: bool):
             max_value=365,
             value=DEFAULT_DAYS_LIMIT,
         )
+        location = st.text_input("Localisation", placeholder="Paris, Lyon, Remote")
+        contract_type = st.text_input("Type de contrat", placeholder="CDI, Stage, Alternance")
+        experience = st.selectbox(
+            "Expérience",
+            ["Tous", "D (Débutant)", "E (Expérimenté)", "S (Senior)"],
+        )
 
-        with st.expander("Filtres avancés"):
-            location = st.text_input("Localisation", placeholder="ex: Paris")
-            contract_type = st.text_input("Type de contrat", placeholder="ex: CDI")
-            experience = st.selectbox(
-                "Expérience", ["Tous", "D (Débutant)", "E (Expérimenté)", "S (Senior)"]
-            )
-            if experience == "Tous":
-                experience = None
-            else:
-                experience = experience[0]
+        info_card(
+            "Ce que fait le moteur",
+            "Extraction du texte, recherche vectorielle, filtres optionnels puis tri par score de similarité.",
+            tone="sage",
+        )
 
     if st.button(
-        "🔍 Lancer le matching",
-        type="primary",
+        "Lancer le matching",
+        use_container_width=True,
         disabled=not uploaded_file or not api_status,
     ):
-        if uploaded_file:
-            with st.spinner("Analyse du CV en cours..."):
-                try:
-                    data = api_client.match_cv(
-                        file_content=uploaded_file.getvalue(),
-                        filename=uploaded_file.name,
-                        top_n=top_n,
-                        days_limit=days_limit,
-                        location=location if location else None,
-                        contract_type=contract_type if contract_type else None,
-                        experience=experience,
-                    )
+        selected_experience = None if experience == "Tous" else experience[:1]
+        with st.spinner("Analyse du CV et recherche des meilleures offres..."):
+            try:
+                result = api_client.match_cv(
+                    file_content=uploaded_file.getvalue(),
+                    filename=uploaded_file.name,
+                    top_n=top_n,
+                    days_limit=days_limit,
+                    location=location or None,
+                    contract_type=contract_type or None,
+                    experience=selected_experience,
+                )
+                st.session_state.last_match_result = result
+                st.session_state.last_match_error = None
+            except Exception as exc:
+                st.session_state.last_match_error = str(exc)
 
-                    status_message(
-                        f"✅ {data['total_matches']} offres trouvées en {data['execution_time']:.2f}s",
-                        "success",
-                    )
+    if st.session_state.get("last_match_error"):
+        status_message(f"Erreur de matching: {st.session_state['last_match_error']}", "error")
 
-                    # Métriques
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        metric_card(
-                            "Offres trouvées", str(data["total_matches"]), "purple"
-                        )
-                    with col2:
-                        metric_card("Caractères CV", f"{data['cv_length']:,}", "pink")
-                    with col3:
-                        metric_card(
-                            "Temps d'exécution",
-                            f"{data['execution_time']:.2f}s",
-                            "blue",
-                        )
+    data = st.session_state.get("last_match_result")
+    if not data:
+        if not api_status:
+            info_card(
+                "Matching indisponible",
+                "Le service de matching reviendra dès que l'API sera joignable.",
+                tone="gold",
+            )
+            return
 
-                    st.markdown("---")
+        timeline(
+            [
+                ("Ajoutez un CV", "Le moteur lit le PDF et extrait le texte exploitable."),
+                ("Cadrez votre recherche", "Filtrez par fraîcheur, lieu ou type de contrat."),
+                ("Analysez les matches", "Passez ensuite une offre prometteuse dans les conseils IA."),
+            ]
+        )
+        return
 
-                    # Affichage des résultats
-                    for i, match in enumerate(data["matches"], 1):
-                        score = match["similarity_score"]
-                        if score > 0.7:
-                            score_emoji = "🟢"
-                            score_class = "score-high"
-                            score_label = "Excellent"
-                        elif score > 0.5:
-                            score_emoji = "🟡"
-                            score_class = "score-medium"
-                            score_label = "Bon"
-                        else:
-                            score_emoji = "🔴"
-                            score_class = "score-low"
-                            score_label = "Moyen"
+    status_message(
+        f"{data['total_matches']} offres trouvées en {data['execution_time']:.2f}s.",
+        "success",
+    )
+    metric_row(
+        [
+            {
+                "label": "Matches retournés",
+                "value": str(data["total_matches"]),
+                "detail": "Top résultats renvoyés par l'API",
+                "tone": "accent",
+            },
+            {
+                "label": "Taille du CV",
+                "value": f"{data['cv_length']:,}".replace(",", " "),
+                "detail": "Nombre de caractères exploités",
+                "tone": "sage",
+            },
+            {
+                "label": "Temps d'exécution",
+                "value": f"{data['execution_time']:.2f}s",
+                "detail": "Temps total côté backend",
+                "tone": "gold",
+            },
+        ]
+    )
 
-                        with st.expander(
-                            f"{score_emoji} #{i} - {match['title']} - {match['company']} ({match['similarity_score']:.1%})",
-                            expanded=(i <= 3),
-                        ):
-                            # Sanitize user-provided content to prevent XSS
-                            safe_title = html.escape(match["title"])
-                            safe_company = html.escape(match["company"])
+    section_intro(
+        "Shortlist recommandée",
+        "Chaque résultat peut devenir une cible immédiate pour les conseils IA.",
+    )
 
-                            st.markdown(
-                                f"""
-                                <div style='background: linear-gradient(90deg, #f8f9fa 0%, #ffffff 100%); 
-                                            padding: 1rem; border-radius: 8px; margin-bottom: 1rem;'>
-                                    <h3 style='margin: 0; color: #333; border: none;'>{safe_title}</h3>
-                                    <p style='margin: 0.5rem 0 0 0; color: #666;'>
-                                        <strong>{safe_company}</strong>
-                                    </p>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
+    if not data["matches"]:
+        empty_state(
+            "Aucun match exploitable",
+            "Essayez d'élargir la période ou de retirer des filtres trop stricts.",
+        )
+        return
 
-                            col1, col2 = st.columns([3, 1])
+    for index, match in enumerate(data["matches"], start=1):
+        label, css_class, interpretation = score_badge(match.get("similarity_score"))
+        meta = [
+            match.get("location") or "Lieu non précisé",
+            match.get("contract_type") or "Contrat non précisé",
+            match.get("source") or "Source inconnue",
+            format_datetime(match.get("date_publication")),
+        ]
+        job_card(
+            f"#{index} · {match.get('title', 'Offre')}",
+            match.get("company", "Entreprise"),
+            meta,
+            description=interpretation,
+            score_label=f"{label} · {match.get('similarity_score', 0):.0%}",
+            score_class=css_class,
+        )
 
-                            with col1:
-                                info_items = []
-                                if match.get("location"):
-                                    info_items.append(
-                                        f"📍 **Localisation:** {match['location']}"
-                                    )
-                                if match.get("contract_type"):
-                                    info_items.append(
-                                        f"📝 **Contrat:** {match['contract_type']}"
-                                    )
-                                if match.get("required_experience"):
-                                    info_items.append(
-                                        f"💼 **Expérience:** {match['required_experience']}"
-                                    )
-                                if match.get("source"):
-                                    info_items.append(
-                                        f"🔗 **Source:** {match['source']}"
-                                    )
+        btn_col1, btn_col2 = st.columns([1, 1])
+        with btn_col1:
+            if match.get("url"):
+                st.link_button(
+                    "Voir l'offre source",
+                    match["url"],
+                    use_container_width=True,
+                )
+        with btn_col2:
+            if st.button(
+                "Envoyer vers les conseils IA",
+                key=f"matching_advice_{match['job_id']}",
+                use_container_width=True,
+            ):
+                st.session_state.preselected_job_id = match["job_id"]
+                go_to_page("advice")
 
-                                for item in info_items:
-                                    st.markdown(item)
-
-                            with col2:
-                                st.markdown(
-                                    f"""
-                                    <div style='text-align: center; padding: 1rem; 
-                                                background: #f8f9fa; border-radius: 8px;'>
-                                        <div style='font-size: 2rem; margin-bottom: 0.5rem;'>
-                                            {score_emoji}
-                                        </div>
-                                        <div class='{score_class}' style='font-size: 1.5rem;'>
-                                            {match["similarity_score"]:.1%}
-                                        </div>
-                                        <div style='color: #666; font-size: 0.9rem; margin-top: 0.25rem;'>
-                                            {score_label}
-                                        </div>
-                                    </div>
-                                    """,
-                                    unsafe_allow_html=True,
-                                )
-
-                                if match.get("url"):
-                                    st.link_button(
-                                        "🔗 Voir l'offre",
-                                        match["url"],
-                                        use_container_width=True,
-                                    )
-
-                except Exception as e:
-                    st.error(f"❌ Erreur lors de la requête: {str(e)}")
+        with st.expander(f"Lire le contexte du match #{index}"):
+            st.markdown(f"**Score**: {match.get('similarity_score', 0):.1%}")
+            st.markdown(f"**Lecture**: {interpretation}")
+            st.markdown(
+                f"**Expérience demandée**: {match.get('required_experience', 'Non renseignée')}"
+            )
