@@ -58,6 +58,10 @@ class DashboardResponse(BaseModel):
     region_breakdown: list[BreakdownItem] = Field(
         default_factory=list, description="Répartition par région"
     )
+    top_hard_skills: list[BreakdownItem] = Field(
+        default_factory=list,
+        description="Compétences techniques les plus fréquentes dans les offres",
+    )
     recent_jobs: list[DashboardJobPreview] = Field(
         default_factory=list, description="Dernières offres disponibles"
     )

@@ -7,7 +7,7 @@ import streamlit as st
 from ui.components.api_status import show_api_error
 from ui.components.sidebar import render_sidebar
 from ui.components.top_nav import render_top_nav
-from ui.pages import admin, advice, home, jobs, matching
+from ui.pages import admin, advice, cover_letter, home, jobs, matching
 from ui.utils.api_client import APIClient
 from ui.utils.config import CUSTOM_CSS, DEFAULT_API_URL, PAGE_CONFIG
 from ui.utils.navigation import sync_page_state
@@ -58,5 +58,7 @@ elif page == "jobs":
     jobs.render(api_client, api_status)
 elif page == "advice":
     advice.render(api_client, api_status)
+elif page == "cover_letter":
+    cover_letter.render(api_client, api_status)
 elif page == "admin":
     admin.render(api_client, api_status, status_details=status_details)

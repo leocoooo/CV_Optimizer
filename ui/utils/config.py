@@ -36,7 +36,7 @@ NAV_ITEMS = [
     {
         "key": "jobs",
         "label": "Opportunites",
-        "nav_label": "Marche",
+        "nav_label": "Offre d'emploi",
         "icon": "🔎",
         "description": "Explorer, filtrer et analyser les offres du marche.",
     },
@@ -46,6 +46,13 @@ NAV_ITEMS = [
         "nav_label": "Coach IA",
         "icon": "✍️",
         "description": "Ameliorer une candidature a partir d'une offre cible.",
+    },
+    {
+        "key": "cover_letter",
+        "label": "Lettre de motivation",
+        "nav_label": "Lettre de Motivation",
+        "icon": "✉️",
+        "description": "Generer une lettre de motivation a partir du CV et d'une offre.",
     },
     {
         "key": "admin",

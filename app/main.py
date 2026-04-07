@@ -6,12 +6,14 @@ Configure l'application FastAPI avec tous les middlewares et routers.
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from loguru import logger
 
 from app.api.router import api_router
 from app.config import get_settings
+from app.core.exceptions import CVOptimizerException
 
 
 # Récupération de la configuration
@@ -88,6 +90,19 @@ app.add_middleware(
 
 # Inclusion du router principal
 app.include_router(api_router)
+
+
+@app.exception_handler(CVOptimizerException)
+async def cvoptimizer_exception_handler(
+    request: Request, exc: CVOptimizerException
+):
+    """Retourne les erreurs métier avec un code HTTP explicite."""
+    logger.warning(
+        f"Erreur API métier sur {request.url.path}: {exc.message} ({exc.status_code})"
+    )
+    detail = {"message": exc.message}
+    detail.update(exc.detail or {})
+    return JSONResponse(status_code=exc.status_code, content={"detail": detail})
 
 
 if __name__ == "__main__":

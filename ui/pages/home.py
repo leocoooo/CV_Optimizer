@@ -261,6 +261,14 @@ def render(api_client, api_status: bool, status_details: dict | None = None) -> 
         dynamism_lines.append(f"{active_sources} sources sont deja suivies dans la plateforme.")
         info_card("Dynamique du marche", "\n".join(dynamism_lines), tone="accent")
 
+        if dashboard and dashboard.get("top_hard_skills"):
+            info_card(
+                "Analyse de marche sur les offres d'emploi",
+                "Les competences techniques qui ressortent le plus dans les offres deja collectees.",
+                tone="accent",
+            )
+            tag_cloud(_labels_from_breakdown(dashboard["top_hard_skills"], limit=8), tone="accent")
+
         if dashboard and dashboard.get("source_breakdown"):
             info_card(
                 "Sources les plus actives",

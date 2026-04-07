@@ -15,6 +15,28 @@ class APIClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = 30
 
+    def _raise_for_status_with_message(self, response: requests.Response) -> None:
+        """Relève une erreur HTTP avec le message backend si disponible."""
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            message = None
+            try:
+                payload = response.json()
+            except Exception:
+                payload = None
+
+            if isinstance(payload, dict):
+                detail = payload.get("detail")
+                if isinstance(detail, dict):
+                    message = detail.get("message") or detail.get("hint")
+                elif isinstance(detail, str):
+                    message = detail
+
+            if message:
+                raise RuntimeError(str(message)) from exc
+            raise
+
     def check_health(self) -> bool:
         """Vérifie si l'API est accessible."""
         try:
@@ -170,6 +192,39 @@ class APIClient:
             timeout=90,
         )
         response.raise_for_status()
+        return response.json()
+
+    def generate_cover_letter(
+        self,
+        file_content: bytes,
+        filename: str,
+        job_id: str,
+        applicant_name: str,
+        city: str = "",
+        email: str = "",
+        phone: str = "",
+        letter_language: str = "english",
+        focus_note: str = "",
+    ) -> Dict[str, Any]:
+        """Génère une lettre de motivation et sa version LaTeX."""
+        files = {"file": (filename, file_content, "application/pdf")}
+        data = {
+            "job_id": job_id,
+            "applicant_name": applicant_name,
+            "city": city,
+            "email": email,
+            "phone": phone,
+            "letter_language": letter_language,
+            "focus_note": focus_note,
+        }
+
+        response = requests.post(
+            f"{self.base_url}/api/cover-letter",
+            files=files,
+            data=data,
+            timeout=120,
+        )
+        self._raise_for_status_with_message(response)
         return response.json()
 
     def collect_jobs(

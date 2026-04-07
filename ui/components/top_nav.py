@@ -25,13 +25,14 @@ def render_top_nav(current_page: str, title: str, api_status: bool) -> str:
                 '<span class="utility-item">✓ Matching en quelques secondes</span>'
                 '<span class="utility-item">✓ Lecture du marche unifiee</span>'
                 '<span class="utility-item">✓ Coach IA integre</span>'
-                '<span class="utility-item utility-rating">★ 4 modules connectes</span>'
+                '<span class="utility-item">✓ LM contextuelle</span>'
+                '<span class="utility-item utility-rating">★ 5 modules connectes</span>'
                 "</div>"
             ),
             unsafe_allow_html=True,
         )
 
-        shell_cols = st.columns([1.45, 3.85, 1.35], gap="medium")
+        shell_cols = st.columns([1.35, 4.1, 1.3], gap="medium")
         with shell_cols[0]:
             st.markdown(
                 (

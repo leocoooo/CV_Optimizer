@@ -29,6 +29,12 @@ Tickets disponibles:
 - `tickets/CVO-117-top-bar-art-direction.md`
 - `tickets/CVO-118-color-alignment-warm-theme.md`
 - `tickets/CVO-119-header-logo-wordmark.md`
+- `tickets/CVO-120-cover-letter-tab.md`
+- `tickets/CVO-121-cover-letter-tab-rename.md`
+- `tickets/CVO-122-cover-letter-pdf-export.md`
+- `tickets/CVO-123-market-analysis-top-skills.md`
+- `tickets/CVO-124-cover-letter-error-hardening.md`
+- `tickets/CVO-125-jobs-tab-rename.md`
 
 Lecture recommandée:
 
@@ -51,3 +57,9 @@ Lecture recommandée:
 17. puis `CVO-117` pour rapprocher le haut de page d'une DA SaaS plus premium avec barre info, nav blanche et hero centre
 18. puis `CVO-118` pour conserver la nouvelle structure du haut de page tout en revenant a la palette chaude historique du projet
 19. puis `CVO-119` pour remplacer le bloc texte du header par un vrai logo wordmark en haut a gauche
+20. puis `CVO-120` pour ajouter un onglet de generation de lettre de motivation base sur le CV, l'offre et une structure LaTeX proche du modele fourni
+21. puis `CVO-121` pour renommer l'onglet `LM` en `Lettre de Motivation` dans la navigation
+22. puis `CVO-122` pour ajouter le telechargement PDF de la lettre en plus du fichier LaTeX
+23. puis `CVO-123` pour ajouter dans l'accueil une analyse de marche avec les competences techniques qui ressortent le plus dans les offres
+24. puis `CVO-124` pour durcir la generation de lettre face aux erreurs LaTeX et renvoyer des messages backend plus propres
+25. puis `CVO-125` pour renommer l'onglet `Marche` en `Offre d'emploi`

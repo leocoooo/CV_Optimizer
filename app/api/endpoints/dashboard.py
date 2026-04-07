@@ -2,6 +2,8 @@
 Endpoint public d'agrégation pour le cockpit UI.
 """
 
+from collections import Counter
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, nullslast
 from sqlalchemy.orm import Session
@@ -11,6 +13,57 @@ from app.schemas.dashboard import BreakdownItem, DashboardJobPreview, DashboardR
 from src.database.models import JobOffer
 
 router = APIRouter()
+
+
+def _split_skills(raw_value: str | None) -> list[str]:
+    """Découpe un champ de hard skills en liste propre."""
+    if not raw_value:
+        return []
+
+    normalized = str(raw_value)
+    for separator in [";", "|", "\n", "•", "·"]:
+        normalized = normalized.replace(separator, ",")
+
+    skills: list[str] = []
+    for chunk in normalized.split(","):
+        item = " ".join(chunk.strip().split())
+        item = item.strip("-– ")
+        if len(item) < 2:
+            continue
+        skills.append(item)
+    return skills
+
+
+def _top_hard_skills(db: Session, limit: int = 8) -> list[BreakdownItem]:
+    """Agrège les compétences techniques les plus fréquentes dans les offres."""
+    rows = (
+        db.query(JobOffer.hard_skills)
+        .filter(JobOffer.hard_skills.is_not(None))
+        .all()
+    )
+
+    counter: Counter[str] = Counter()
+    display_labels: dict[str, str] = {}
+
+    for (raw_hard_skills,) in rows:
+        seen_in_offer: set[str] = set()
+        for skill in _split_skills(raw_hard_skills):
+            normalized = skill.casefold()
+            if normalized in seen_in_offer:
+                continue
+            seen_in_offer.add(normalized)
+            counter[normalized] += 1
+
+            existing_label = display_labels.get(normalized)
+            if not existing_label or (
+                existing_label.islower() and any(char.isupper() for char in skill)
+            ):
+                display_labels[normalized] = skill
+
+    return [
+        BreakdownItem(label=display_labels.get(key, key), value=value)
+        for key, value in counter.most_common(limit)
+    ]
 
 
 @router.get(
@@ -67,6 +120,7 @@ async def get_dashboard(db: Session = Depends(get_db)):
         .limit(6)
         .all()
     )
+    top_hard_skills = _top_hard_skills(db)
 
     return DashboardResponse(
         total_jobs=total_jobs,
@@ -91,6 +145,7 @@ async def get_dashboard(db: Session = Depends(get_db)):
             for label, value in region_rows
             if label
         ],
+        top_hard_skills=top_hard_skills,
         recent_jobs=[
             DashboardJobPreview(
                 id=str(job.id),
