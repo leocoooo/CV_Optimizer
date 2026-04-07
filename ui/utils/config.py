@@ -36,7 +36,7 @@ NAV_ITEMS = [
     {
         "key": "jobs",
         "label": "Opportunites",
-        "nav_label": "Offre d'emploi",
+        "nav_label": "Offres d'emploi",
         "icon": "🔎",
         "description": "Explorer, filtrer et analyser les offres du marche.",
     },
@@ -194,6 +194,10 @@ CUSTOM_CSS = """
     .marketing-hero {
         position: relative;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
         text-align: center;
         background:
             radial-gradient(circle at 82% 18%, rgba(228, 138, 73, 0.16), transparent 22%),
@@ -208,6 +212,8 @@ CUSTOM_CSS = """
 
     .marketing-eyebrow {
         margin: 0;
+        width: 100%;
+        text-align: center;
         font-size: 0.78rem;
         letter-spacing: 0.16em;
         text-transform: uppercase;
@@ -217,6 +223,7 @@ CUSTOM_CSS = """
     .marketing-title {
         margin: 1rem auto 0 auto;
         max-width: 900px;
+        text-align: center;
         color: var(--ink);
         font-size: 3.45rem;
         line-height: 1.06;
@@ -231,6 +238,7 @@ CUSTOM_CSS = """
     .marketing-copy {
         margin: 1.1rem auto 0 auto;
         max-width: 760px;
+        text-align: center;
         color: rgba(61, 76, 69, 0.84);
         font-size: 1.08rem;
         line-height: 1.72;
@@ -414,19 +422,23 @@ CUSTOM_CSS = """
     .tag-cloud {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem;
+        gap: 0.62rem;
         margin-top: 0.8rem;
         align-items: center;
     }
 
     .tag {
         display: inline-flex;
-        padding: 0.42rem 0.72rem;
+        align-items: center;
+        padding: 0.5rem 0.78rem;
         border-radius: 999px;
         background: var(--surface-strong);
         border: 1px solid var(--line);
         color: var(--ink);
         font-size: 0.86rem;
+        line-height: 1.4;
+        text-align: left;
+        white-space: normal;
     }
 
     .tag.sage {

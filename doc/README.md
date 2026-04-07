@@ -35,6 +35,11 @@ Tickets disponibles:
 - `tickets/CVO-123-market-analysis-top-skills.md`
 - `tickets/CVO-124-cover-letter-error-hardening.md`
 - `tickets/CVO-125-jobs-tab-rename.md`
+- `tickets/CVO-126-home-hero-copy-adjustment.md`
+- `tickets/CVO-127-home-hero-centering.md`
+- `tickets/CVO-128-home-cta-wording.md`
+- `tickets/CVO-129-tag-spacing-polish.md`
+- `tickets/CVO-130-jobs-tab-plural.md`
 
 Lecture recommandée:
 
@@ -63,3 +68,8 @@ Lecture recommandée:
 23. puis `CVO-123` pour ajouter dans l'accueil une analyse de marche avec les competences techniques qui ressortent le plus dans les offres
 24. puis `CVO-124` pour durcir la generation de lettre face aux erreurs LaTeX et renvoyer des messages backend plus propres
 25. puis `CVO-125` pour renommer l'onglet `Marche` en `Offre d'emploi`
+26. puis `CVO-126` pour ajuster la phrase du hero d'accueil en ajoutant la mention `grace a l'IA`
+27. puis `CVO-127` pour recentrer plus proprement le texte du hero d'accueil
+28. puis `CVO-128` pour remplacer `Explorer le marche` par `Explorer les offres d'emploi` dans le CTA accueil
+29. puis `CVO-129` pour aérer davantage les tags et éviter que le texte paraisse collé dans la colonne de droite
+30. puis `CVO-130` pour passer l'onglet `Offre d'emploi` au pluriel `Offres d'emploi`

@@ -73,7 +73,7 @@ def render(api_client, api_status: bool, status_details: dict | None = None) -> 
         title_tail=".",
         subtitle=(
             "Explorez le marche, comparez vos competences aux offres cibles et "
-            "activez un coach IA pour produire une candidature plus claire, plus convaincante et plus rapide a finaliser."
+            "activez un coach IA pour produire une candidature plus claire, plus convaincante et plus rapide a finaliser grace a l'IA."
         ),
         pills=[
             "Lecture du marche en continu",
@@ -86,7 +86,7 @@ def render(api_client, api_status: bool, status_details: dict | None = None) -> 
     action_columns = st.columns([1.1, 1.25, 1.1], gap="medium")
     with action_columns[0]:
         if st.button(
-            "Explorer le marche",
+            "Explorer les offres d'emploi",
             key="home_marketing_jobs",
             use_container_width=True,
         ):
